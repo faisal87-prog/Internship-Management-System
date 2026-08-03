@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI-Powered Internship Management Platform
 
-## Getting Started
+A platform for managing internship programs with AI-assisted roadmap generation, task tracking, weekly performance reports, and final internship summaries.
 
-First, run the development server:
+## Approved MVP Scope
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The MVP supports Admin, Mentor, and Intern roles with:
+
+- Internship program creation and management
+- Intern profiles, skills, and preferences
+- AI roadmap generation with mentor review and approval
+- Kanban task board with submissions and mentor feedback
+- AI weekly performance reports
+- Final internship summaries with PDF download
+- Role-based dashboards
+
+See [docs/mvp-scope.md](docs/mvp-scope.md) for included and excluded features.
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js |
+| Backend | Python Django + Django REST Framework (later) |
+| Database | PostgreSQL |
+| AI | OpenAI API (via Django backend only) |
+| File Storage | Local media during MVP development |
+
+## Repository Structure
+
+```
+├── README.md
+├── docs/              # System documentation
+├── frontend/          # Next.js app (not implemented)
+├── backend/           # Django project (not implemented)
+├── ai/                # Two-stage AI: prompt_builder, generators, validators, schemas
+├── shared/            # Enums, contracts, validation rules
+├── planning/          # Implementation backlog and task lists
+├── .env.example       # Environment variable placeholders
+└── .gitignore
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Current Project Status
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Frontend MVP UI in progress (mock data)**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The Next.js frontend has been initialized with Tailwind CSS and role-based screens using mock data only. Backend, database, JWT authentication, and AI integrations are not implemented yet.
 
-## Learn More
+## Future Implementation Order
 
-To learn more about Next.js, take a look at the following resources:
+See [docs/implementation-order.md](docs/implementation-order.md) for the recommended sequence:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Backend foundation
+2. User and role system
+3. Programs and intern profiles
+4. Roadmaps
+5. Tasks and assignments
+6. Submissions and reviews
+7. Weekly reports
+8. Final summaries and PDFs
+9. Frontend integration
+10. AI integration
+11. Testing and deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How to Use This Documentation
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Start with [docs/system-overview.md](docs/system-overview.md) for business context.
+2. Read [docs/mvp-scope.md](docs/mvp-scope.md) to understand what is in and out of scope.
+3. Review [docs/roles-and-permissions.md](docs/roles-and-permissions.md) for access control rules.
+4. Follow [docs/user-journey.md](docs/user-journey.md) for the end-to-end flow.
+5. Use [docs/database-design.md](docs/database-design.md) and [shared/](shared/) when implementing data models and APIs.
+6. Refer to [docs/ai-features.md](docs/ai-features.md) and [ai/](ai/) for the two-stage AI architecture (Prompt Builder → LLM → Validation → Draft).
+7. All MVP decisions are documented; see [docs/open-questions.md](docs/open-questions.md) for the full resolved decision log.
