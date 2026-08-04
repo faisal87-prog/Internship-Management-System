@@ -24,7 +24,7 @@ export default function EditProgramPage() {
     <div>
       <PageHeader
         title="Edit program"
-        description="Update program details and manually manage program status."
+        description="Update every program field you entered at creation. Mentor assignment remains automatic."
         actions={
           <Link href={`/mentor/programs/${program.id}`} className="btn-secondary">
             Cancel
@@ -42,6 +42,34 @@ export default function EditProgramPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
+            <label className="label" htmlFor="role">Role</label>
+            <input id="role" className="input" defaultValue={program.role} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="department">Department</label>
+            <input id="department" className="input" defaultValue={program.department} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="startDate">Start date</label>
+            <input id="startDate" type="date" className="input" defaultValue={program.startDate} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="endDate">End date</label>
+            <input id="endDate" type="date" className="input" defaultValue={program.endDate} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="durationWeeks">Duration in weeks</label>
+            <input id="durationWeeks" type="number" min={1} className="input" defaultValue={program.durationWeeks} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="weeklyHours">Weekly hours</label>
+            <input id="weeklyHours" type="number" min={1} className="input" defaultValue={program.weeklyHours} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="maxInterns">Maximum number of interns</label>
+            <input id="maxInterns" type="number" min={1} className="input" defaultValue={program.maxInterns} required />
+          </div>
+          <div>
             <label className="label" htmlFor="status">Status</label>
             <select id="status" className="input" defaultValue={program.status}>
               <option value="DRAFT">Draft</option>
@@ -51,15 +79,39 @@ export default function EditProgramPage() {
               <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
-          <div>
-            <label className="label" htmlFor="weeklyHours">Weekly hours</label>
-            <input id="weeklyHours" type="number" className="input" defaultValue={program.weeklyHours} />
-          </div>
+        </div>
+        <div>
+          <label className="label" htmlFor="skillsToDevelop">Skills to develop</label>
+          <input id="skillsToDevelop" className="input" defaultValue={program.skillsToDevelop.join(", ")} />
+        </div>
+        <div>
+          <label className="label" htmlFor="skillsNeeded">Skills needed</label>
+          <input id="skillsNeeded" className="input" defaultValue={program.skillsNeeded.join(", ")} />
         </div>
         <div>
           <label className="label" htmlFor="goals">Goals</label>
           <textarea id="goals" className="input" rows={2} defaultValue={program.goals} />
         </div>
+        <div>
+          <label className="label" htmlFor="expectedOutcome">Expected outcome</label>
+          <textarea id="expectedOutcome" className="input" rows={2} defaultValue={program.expectedOutcome} />
+        </div>
+        <div>
+          <label className="label" htmlFor="finalProject">Final project</label>
+          <input id="finalProject" className="input" defaultValue={program.finalProject ?? ""} />
+        </div>
+        <div>
+          <label className="label" htmlFor="additionalInstructions">Additional instructions</label>
+          <textarea
+            id="additionalInstructions"
+            className="input"
+            rows={2}
+            defaultValue={program.additionalInstructions ?? ""}
+          />
+        </div>
+        <p className="text-sm text-ink-muted">
+          Reference materials are managed on the dedicated materials page for this program.
+        </p>
         {message ? (
           <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
             {message}

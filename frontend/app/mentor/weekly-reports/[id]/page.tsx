@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fullName, getUser, internProfiles, weeklyReports } from "@/mock/data";
@@ -19,13 +20,24 @@ export default function WeeklyReportDetailPage() {
   const intern = getUser(
     internProfiles.find((ip) => ip.id === report.internProfileId)?.userId ?? "",
   );
+  const internName = intern ? fullName(intern) : "Intern";
 
   return (
     <div>
       <PageHeader
         title={`Week ${report.weekNumber} report`}
-        description={intern ? fullName(intern) : "Intern"}
-        actions={<Link href="/mentor/weekly-reports" className="btn-secondary">Back</Link>}
+        description={internName}
+        actions={
+          <>
+            {status === "APPROVED" ? (
+              <DownloadPdfButton
+                fileName={`week-${report.weekNumber}-report.pdf`}
+                label="Download PDF"
+              />
+            ) : null}
+            <Link href="/mentor/weekly-reports" className="btn-secondary">Back</Link>
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">

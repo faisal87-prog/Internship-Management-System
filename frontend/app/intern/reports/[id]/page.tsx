@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
 import { getInternContext } from "@/lib/intern";
@@ -31,7 +32,15 @@ export default function InternReportDetailPage() {
       <PageHeader
         title={`Week ${report.weekNumber} performance report`}
         description="Approved by your mentor"
-        actions={<Link href="/intern/reports" className="btn-secondary">Back</Link>}
+        actions={
+          <>
+            <DownloadPdfButton
+              fileName={`week-${report.weekNumber}-report.pdf`}
+              label="Download PDF"
+            />
+            <Link href="/intern/reports" className="btn-secondary">Back</Link>
+          </>
+        }
       />
       <div className="card space-y-4 p-6 text-sm">
         <div>

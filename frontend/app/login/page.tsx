@@ -1,58 +1,125 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useMockAuth } from "@/context/MockAuthContext";
 import { dashboardPath } from "@/lib/navigation";
-import { roleLabel } from "@/lib/labels";
-import { fullName, users } from "@/mock/data";
+import { DEMO_ACCESS_HINT, MOCK_CREDENTIALS } from "@/mock/auth";
+import { users } from "@/mock/data";
 
 export default function LoginPage() {
-  const { user, isReady, loginAs } = useMockAuth();
+  const { user, isReady, login } = useMockAuth();
   const router = useRouter();
-  const demoUsers = users.filter((u) => u.isActive);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (isReady && user) router.replace(dashboardPath(user.role));
   }, [isReady, user, router]);
 
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#ffedd5,_#fff7ed_45%,_#ffffff)] px-4 py-10">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-10 max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">
-            AI Internship Management
-          </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-            Choose a demo user to explore the workspace
-          </h1>
-          <p className="mt-4 text-base text-ink-muted">
-            Mock authentication only. No JWT, backend, or AI calls are used in this
-            frontend phase.
-          </p>
-        </div>
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!identifier.trim() || !password) {
+      setError("Please enter both username/email and password.");
+      return;
+    }
+    const result = login(identifier, password);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    const lower = identifier.trim().toLowerCase();
+    const cred = MOCK_CREDENTIALS.find((c) =>
+      c.identifiers.some((id) => id.toLowerCase() === lower),
+    );
+    const matchedUser = users.find((u) => u.id === cred?.userId);
+    if (matchedUser) {
+      router.push(dashboardPath(matchedUser.role));
+    }
+  }
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {demoUsers.map((demo) => (
-            <button
-              key={demo.id}
-              type="button"
-              onClick={() => {
-                loginAs(demo.id);
-                router.push(dashboardPath(demo.role));
-              }}
-              className="card group p-5 text-left transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-card"
-            >
-              <span className="inline-flex rounded-full bg-brand-light px-2.5 py-1 text-xs font-semibold text-brand-dark">
-                {roleLabel[demo.role]}
-              </span>
-              <p className="mt-4 text-lg font-semibold text-ink">{fullName(demo)}</p>
-              <p className="mt-1 text-sm text-ink-muted">{demo.email}</p>
-              <p className="mt-6 text-sm font-semibold text-brand group-hover:text-brand-dark">
-                Enter workspace →
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#ffedd5,_#fff7ed_40%,_#f3f4f6)] px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="card px-6 py-8 sm:px-8">
+          <div className="flex flex-col items-center text-center">
+            <Image
+              src="/branding/orange-logo.jpeg"
+              alt="Orange"
+              width={120}
+              height={120}
+              className="h-20 w-20 object-contain sm:h-24 sm:w-24"
+              priority
+            />
+            <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink sm:text-[1.65rem]">
+              AI Internship Management Platform
+            </h1>
+            <p className="mt-2 text-sm text-ink-muted">
+              Sign in to access your internship workspace.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
+            <div>
+              <label className="label" htmlFor="identifier">
+                Username or Email
+              </label>
+              <input
+                id="identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                className="input"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="password">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  className="input pr-20"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-2 my-auto rounded-lg px-2 text-xs font-semibold text-brand hover:text-brand-dark"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            {error ? (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
+                {error}
               </p>
+            ) : null}
+
+            <button type="submit" className="btn-primary w-full">
+              Sign In
             </button>
-          ))}
+          </form>
+
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-ink-muted">
+            {DEMO_ACCESS_HINT}
+          </p>
         </div>
       </div>
     </div>

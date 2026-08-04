@@ -12,7 +12,6 @@ export const navigationByRole: Record<UserRole, NavItem[]> = {
     { href: "/admin/mentors", label: "Mentors" },
     { href: "/admin/interns", label: "Interns" },
     { href: "/admin/programs", label: "Programs" },
-    { href: "/admin/activity", label: "Activity" },
   ],
   MENTOR: [
     { href: "/mentor/dashboard", label: "Dashboard" },

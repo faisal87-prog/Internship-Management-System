@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -23,6 +24,11 @@ export default function AdminInternsPage() {
       <PageHeader
         title="Interns"
         description="Interns grouped under each mentor. Admin can view assignments and account status."
+        actions={
+          <Link href="/admin/users/new?role=INTERN" className="btn-primary">
+            Create Intern
+          </Link>
+        }
       />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">

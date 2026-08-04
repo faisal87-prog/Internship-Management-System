@@ -4,9 +4,8 @@ import Link from "next/link";
 import { ChartPlaceholder, BarRow } from "@/components/ui/ChartPlaceholder";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ProgramSummary } from "@/components/programs/ProgramSummary";
 import { useMockAuth } from "@/context/MockAuthContext";
-import { formatDate } from "@/lib/labels";
 import {
   fullName,
   getUser,
@@ -33,23 +32,12 @@ export default function MentorDashboardPage() {
       r.status === "DRAFT" &&
       myInterns.some((ip) => ip.id === r.internProfileId),
   );
-  const scored = myAssignments.filter((ta) => typeof ta.score === "number");
-  const avgScore =
-    scored.length === 0
-      ? 0
-      : Math.round(scored.reduce((sum, ta) => sum + (ta.score ?? 0), 0) / scored.length);
 
   const recentSubs = submissions
     .filter((s) => myAssignments.some((ta) => ta.id === s.taskAssignmentId))
     .slice()
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
     .slice(0, 4);
-
-  const upcoming = myAssignments
-    .filter((ta) => ta.status !== "COMPLETED")
-    .slice()
-    .sort((a, b) => a.deadline.localeCompare(b.deadline))
-    .slice(0, 5);
 
   return (
     <div>
@@ -116,54 +104,6 @@ export default function MentorDashboardPage() {
             color="bg-success"
           />
         </ChartPlaceholder>
-
-        <ChartPlaceholder
-          title="Average intern scores"
-          metric="Mean score across scored assignments"
-          chartType="KPI + distribution"
-          summary={`Average score: ${avgScore}/100`}
-        >
-          <div className="flex h-24 items-end gap-2">
-            {scored.map((ta) => (
-              <div key={ta.id} className="flex-1 rounded-t bg-brand" style={{ height: `${ta.score}%` }} />
-            ))}
-          </div>
-        </ChartPlaceholder>
-
-        <ChartPlaceholder
-          title="Intern performance overview"
-          metric="Completed vs open assignments per intern"
-          chartType="Grouped bar"
-        >
-          {myInterns.map((ip) => {
-            const intern = getUser(ip.userId);
-            const assigned = myAssignments.filter((ta) => ta.internProfileId === ip.id);
-            const done = assigned.filter((ta) => ta.status === "COMPLETED").length;
-            return (
-              <BarRow
-                key={ip.id}
-                label={intern ? fullName(intern) : ip.id}
-                value={done}
-                max={assigned.length || 1}
-              />
-            );
-          })}
-        </ChartPlaceholder>
-
-        <ChartPlaceholder
-          title="Weekly workload distribution"
-          metric="Tasks by roadmap week"
-          chartType="Bar chart"
-        >
-          {[1, 2, 3].map((week) => (
-            <BarRow
-              key={week}
-              label={`Week ${week}`}
-              value={tasks.filter((t) => t.weekNumber === week && myPrograms.some((p) => p.id === t.programId)).length}
-              max={3}
-            />
-          ))}
-        </ChartPlaceholder>
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
@@ -194,58 +134,36 @@ export default function MentorDashboardPage() {
         </section>
 
         <section className="card p-5">
-          <h2 className="section-title">Upcoming task deadlines</h2>
-          <ul className="mt-4 space-y-3">
-            {upcoming.map((ta) => {
-              const task = tasks.find((t) => t.id === ta.taskId);
-              return (
-                <li key={ta.id} className="flex items-center justify-between gap-3 text-sm">
-                  <div>
-                    <p className="font-medium text-ink">{task?.title}</p>
-                    <p className="text-ink-muted">Due {formatDate(ta.deadline)}</p>
-                  </div>
-                  <StatusBadge kind="task" value={ta.status} />
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="section-title">Programs managed</h2>
+            <Link href="/mentor/programs" className="text-sm font-semibold text-brand">
+              View programs
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {myPrograms.map((program) => (
+              <Link
+                key={program.id}
+                href={`/mentor/programs/${program.id}`}
+                className="block rounded-xl border border-line p-4 transition hover:border-brand/40 hover:bg-brand-soft/50"
+              >
+                <ProgramSummary program={program} compact />
+              </Link>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link href="/mentor/roadmaps" className="btn-secondary">
+              Manage roadmaps
+            </Link>
+            <Link href="/mentor/weekly-reports" className="btn-secondary">
+              Weekly reports
+            </Link>
+            <Link href="/mentor/final-summaries" className="btn-secondary">
+              Final summaries
+            </Link>
+          </div>
         </section>
       </div>
-
-      <section className="card mt-6 p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="section-title">Programs managed</h2>
-          <Link href="/mentor/programs" className="text-sm font-semibold text-brand">
-            View programs
-          </Link>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {myPrograms.map((program) => (
-            <Link
-              key={program.id}
-              href={`/mentor/programs/${program.id}`}
-              className="rounded-xl border border-line p-4 transition hover:border-brand/40 hover:bg-brand-soft/50"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-ink">{program.title}</p>
-                <StatusBadge kind="program" value={program.status} />
-              </div>
-              <p className="mt-2 text-sm text-ink-muted">{program.role}</p>
-            </Link>
-          ))}
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Link href="/mentor/roadmaps" className="btn-secondary">
-            Manage roadmaps
-          </Link>
-          <Link href="/mentor/weekly-reports" className="btn-secondary">
-            Weekly reports
-          </Link>
-          <Link href="/mentor/final-summaries" className="btn-secondary">
-            Final summaries
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }

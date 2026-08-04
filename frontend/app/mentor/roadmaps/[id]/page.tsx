@@ -3,23 +3,30 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { ProgramSummary } from "@/components/programs/ProgramSummary";
+import { RoadmapReadOnlyView } from "@/components/roadmaps/RoadmapWeekView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { roadmapScopeLabel } from "@/lib/labels";
-import { getProgram, roadmaps } from "@/mock/data";
+import { getProgram, roadmaps as initialRoadmaps } from "@/mock/data";
+import type { Roadmap } from "@/types";
 
 export default function RoadmapDetailPage() {
   const params = useParams<{ id: string }>();
-  const roadmap = roadmaps.find((r) => r.id === params.id);
-  const [status, setStatus] = useState(roadmap?.status);
+  const seed = initialRoadmaps.find((r) => r.id === params.id);
+  const [roadmap, setRoadmap] = useState<Roadmap | undefined>(
+    seed ? structuredClone(seed) : undefined,
+  );
   const [message, setMessage] = useState("");
 
-  if (!roadmap || !status) return <p>Roadmap not found.</p>;
+  if (!roadmap) return <p>Roadmap not found.</p>;
   const program = getProgram(roadmap.programId);
 
   function publish() {
-    if (status !== "DRAFT") return;
-    setStatus("PUBLISHED");
+    setRoadmap((prev) => {
+      if (!prev || prev.status !== "DRAFT") return prev;
+      return { ...prev, status: "PUBLISHED" };
+    });
     setMessage(
       "Mock publish complete. All approved roadmap tasks for all weeks would be created and assigned.",
     );
@@ -33,12 +40,12 @@ export default function RoadmapDetailPage() {
         actions={
           <>
             <Link href={`/mentor/roadmaps/${roadmap.id}/edit`} className="btn-secondary">
-              Edit draft
+              Edit roadmap
             </Link>
             <Link href={`/mentor/roadmaps/${roadmap.id}/preview`} className="btn-secondary">
               Preview
             </Link>
-            {status === "DRAFT" ? (
+            {roadmap.status === "DRAFT" ? (
               <button type="button" className="btn-primary" onClick={publish}>
                 Publish roadmap
               </button>
@@ -48,7 +55,7 @@ export default function RoadmapDetailPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <StatusBadge kind="roadmap" value={status} />
+        <StatusBadge kind="roadmap" value={roadmap.status} />
         <span className="rounded-full bg-brand-light px-2.5 py-1 text-xs font-semibold text-brand-dark">
           {roadmapScopeLabel[roadmap.scope]}
         </span>
@@ -60,29 +67,14 @@ export default function RoadmapDetailPage() {
         </p>
       ) : null}
 
-      <div className="space-y-4">
-        {roadmap.weeks.map((week) => (
-          <section key={week.weekNumber} className="card p-5">
-            <h2 className="section-title">
-              Week {week.weekNumber}: {week.weeklyFocus}
-            </h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              Objectives: {week.weeklyLearningObjectives.join(" · ")}
-            </p>
-            <ul className="mt-4 space-y-3">
-              {week.suggestedTasks.map((task) => (
-                <li key={task.id} className="rounded-xl border border-line p-3">
-                  <p className="font-semibold text-ink">{task.title}</p>
-                  <p className="mt-1 text-sm text-ink-muted">{task.description}</p>
-                  <p className="mt-2 text-xs text-ink-muted">
-                    {task.difficulty} · {task.estimatedTime} · {task.requirementType}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+      {program ? (
+        <section className="card mb-4 p-5">
+          <h2 className="section-title mb-3">Program summary</h2>
+          <ProgramSummary program={program} compact />
+        </section>
+      ) : null}
+
+      <RoadmapReadOnlyView roadmap={roadmap} />
     </div>
   );
 }

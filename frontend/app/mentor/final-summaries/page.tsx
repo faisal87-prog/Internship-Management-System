@@ -43,6 +43,15 @@ export default function MentorFinalSummariesPage() {
             render: (row) => <StatusBadge kind="ai" value={row.status} />,
           },
           {
+            key: "preview",
+            header: "Summary preview",
+            render: (row) => (
+              <p className="max-w-xs text-xs text-ink-muted line-clamp-2">
+                {row.content.overallPerformanceSummary}
+              </p>
+            ),
+          },
+          {
             key: "score",
             header: "Final score",
             render: (row) =>

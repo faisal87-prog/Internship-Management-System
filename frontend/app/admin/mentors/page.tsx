@@ -12,8 +12,8 @@ export default function AdminMentorsPage() {
         title="Mentors"
         description="View all mentors and how interns and programs are grouped under them."
         actions={
-          <Link href="/admin/users/new" className="btn-primary">
-            Create mentor
+          <Link href="/admin/users/new?role=MENTOR" className="btn-primary">
+            Create Mentor
           </Link>
         }
       />

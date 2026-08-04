@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
+import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useMockAuth } from "@/context/MockAuthContext";
 import { getInternContext } from "@/lib/intern";
-import { formatDate, formatDateTime } from "@/lib/labels";
+import { formatDateTime } from "@/lib/labels";
 import type { Submission, TaskStatus } from "@/types";
 
 const ALLOWED = "PDF, DOC, DOCX, PPT, PPTX, PNG, JPG, JPEG, TXT, CSV, ZIP · max 20 MB each";
@@ -75,37 +76,27 @@ export default function InternTaskDetailPage() {
     <div>
       <PageHeader
         title={task.title}
-        description={task.description}
+        description={`Week ${task.weekNumber} · ${task.requirementType === "REQUIRED" ? "Required" : "Optional"} task`}
         actions={<Link href="/intern/tasks" className="btn-secondary">Back to board</Link>}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="card space-y-3 p-5 lg:col-span-2">
+        <section className="card space-y-4 p-5 lg:col-span-2">
           <StatusBadge kind="task" value={status} />
-          <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-            <div>
-              <dt className="font-semibold text-ink-muted">Deadline</dt>
-              <dd>{formatDate(assignment.deadline)}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-ink-muted">Deliverable</dt>
-              <dd>{task.deliverable}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-ink-muted">Success criteria</dt>
-              <dd>{task.successCriteria}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-ink-muted">Score</dt>
-              <dd>
-                {typeof assignment.score === "number" ? `${assignment.score}/100` : "Not scored yet"}
-              </dd>
-            </div>
-          </dl>
-          {assignment.mentorFeedback ? (
+          <TaskDetailsPanel
+            task={task}
+            dueDate={assignment.deadline}
+            resources={task.resources}
+          />
+          {typeof assignment.score === "number" || assignment.mentorFeedback ? (
             <div className="rounded-xl bg-brand-soft p-3 text-sm">
-              <p className="font-semibold text-ink">Mentor feedback</p>
-              <p className="mt-1 text-ink-muted">{assignment.mentorFeedback}</p>
+              <p className="font-semibold text-ink">Mentor review</p>
+              {typeof assignment.score === "number" ? (
+                <p className="mt-1 text-ink-muted">Score: {assignment.score}/100</p>
+              ) : null}
+              {assignment.mentorFeedback ? (
+                <p className="mt-1 text-ink-muted">{assignment.mentorFeedback}</p>
+              ) : null}
             </div>
           ) : null}
 

@@ -25,10 +25,14 @@ export type SkillLevel = 1 | 2 | 3 | 4 | 5;
 export interface User {
   id: string;
   email: string;
+  username: string;
   firstName: string;
   lastName: string;
   role: UserRole;
   isActive: boolean;
+  phoneNumber?: string;
+  department?: string;
+  jobTitle?: string;
 }
 
 export interface InternProfile {
@@ -39,6 +43,8 @@ export interface InternProfile {
   preferences: string;
   learningGoals: string;
   skills: { name: string; level: SkillLevel }[];
+  major?: string;
+  university?: string;
 }
 
 export interface InternshipProgram {
@@ -62,12 +68,28 @@ export interface InternshipProgram {
   additionalInstructions?: string;
 }
 
-export interface ReferenceMaterial {
+export type ResourceKind =
+  | "PDF"
+  | "DOC"
+  | "PPT"
+  | "IMAGE"
+  | "ZIP"
+  | "LINK"
+  | "OTHER";
+
+/** Shared shape for program reference materials and task learning resources. */
+export interface LearningResource {
   id: string;
-  programId: string;
   title: string;
+  kind: ResourceKind;
+  /** Display file name for uploads */
   fileName?: string;
-  externalLink?: string;
+  /** Local mock path or external URL */
+  href: string;
+}
+
+export interface ReferenceMaterial extends LearningResource {
+  programId: string;
 }
 
 export interface RoadmapTaskDraft {
@@ -80,6 +102,8 @@ export interface RoadmapTaskDraft {
   successCriteria: string;
   source: TaskSource;
   requirementType: TaskRequirementType;
+  dueDate?: string;
+  assignedInternIds?: string[];
   priority?: string;
 }
 
@@ -120,6 +144,7 @@ export interface Task {
   source: TaskSource;
   requirementType: TaskRequirementType;
   defaultDeadline: string;
+  resources: LearningResource[];
 }
 
 export interface TaskAssignment {
@@ -170,9 +195,6 @@ export interface FinalSummary {
     overallPerformanceSummary: string;
     learningJourney: string;
     mainAchievements: string[];
-    skillsDeveloped: string[];
-    strengths: string[];
-    areasForImprovement: string[];
     goalAchievement: string;
     finalPerformanceSummary: string;
   };

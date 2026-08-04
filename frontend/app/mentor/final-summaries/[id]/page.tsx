@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { FinalSummaryContent } from "@/components/final-summary/FinalSummaryContent";
+import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { finalSummaries, fullName, getUser, internProfiles } from "@/mock/data";
@@ -26,20 +28,28 @@ export default function FinalSummaryDetailPage() {
       <PageHeader
         title="Final internship summary"
         description={intern ? fullName(intern) : "Intern"}
-        actions={<Link href="/mentor/final-summaries" className="btn-secondary">Back</Link>}
+        actions={
+          <>
+            <DownloadPdfButton
+              fileName="final-internship-summary.pdf"
+              label="Download PDF"
+            />
+            <Link href="/mentor/final-summaries" className="btn-secondary">Back</Link>
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
         <StatusBadge kind="ai" value={status} />
-        {status === "APPROVED" || summary.pdfAvailable ? (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setMessage("Mock PDF download. ReportLab generation will run on the backend later.")}
-          >
-            Download PDF
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() =>
+            setMessage("Mock regenerate requested. Draft content would be replaced after validation.")
+          }
+        >
+          Regenerate
+        </button>
         {status === "DRAFT" ? (
           <button
             type="button"
@@ -63,39 +73,8 @@ export default function FinalSummaryDetailPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card space-y-3 p-5 text-sm">
-          <div>
-            <h2 className="font-semibold">Overall performance</h2>
-            <p className="text-ink-muted">{summary.content.overallPerformanceSummary}</p>
-          </div>
-          <div>
-            <h2 className="font-semibold">Learning journey</h2>
-            <p className="text-ink-muted">{summary.content.learningJourney}</p>
-          </div>
-          <div>
-            <h2 className="font-semibold">Main achievements</h2>
-            <ul className="list-disc pl-5 text-ink-muted">
-              {summary.content.mainAchievements.map((a) => (
-                <li key={a}>{a}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h2 className="font-semibold">Skills developed</h2>
-            <p className="text-ink-muted">{summary.content.skillsDeveloped.join(", ")}</p>
-          </div>
-          <div>
-            <h2 className="font-semibold">Strengths</h2>
-            <p className="text-ink-muted">{summary.content.strengths.join(", ")}</p>
-          </div>
-          <div>
-            <h2 className="font-semibold">Areas for improvement</h2>
-            <p className="text-ink-muted">{summary.content.areasForImprovement.join(", ")}</p>
-          </div>
-          <div>
-            <h2 className="font-semibold">Final performance summary</h2>
-            <p className="text-ink-muted">{summary.content.finalPerformanceSummary}</p>
-          </div>
+        <section className="card p-5">
+          <FinalSummaryContent content={summary.content} />
         </section>
 
         <section className="card space-y-4 p-5">

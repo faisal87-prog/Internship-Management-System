@@ -35,7 +35,6 @@ export default function InternDashboardPage() {
     ["TO_DO", "IN_PROGRESS", "NEEDS_REVISION", "SUBMITTED"].includes(ta.status),
   );
   const recentFeedback = assignments.filter((ta) => ta.mentorFeedback).slice(0, 3);
-  const scored = assignments.filter((ta) => typeof ta.score === "number");
 
   return (
     <div>
@@ -90,28 +89,7 @@ export default function InternDashboardPage() {
         </ChartPlaceholder>
 
         <ChartPlaceholder
-          title="Score history"
-          metric="Mentor scores (0–100 integers)"
-          chartType="Line / bar placeholder"
-        >
-          <div className="flex h-28 items-end gap-2">
-            {scored.length ? (
-              scored.map((ta) => (
-                <div
-                  key={ta.id}
-                  className="flex-1 rounded-t bg-brand"
-                  style={{ height: `${ta.score}%` }}
-                  aria-label={`Score ${ta.score}`}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-ink-muted">No scores yet.</p>
-            )}
-          </div>
-        </ChartPlaceholder>
-
-        <ChartPlaceholder
-          title="Weekly learning activity"
+          title="Weekly learning progress"
           metric="Tasks by week number"
           chartType="Bar chart"
         >
@@ -124,67 +102,42 @@ export default function InternDashboardPage() {
             />
           ))}
         </ChartPlaceholder>
-      </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <section className="card p-5 lg:col-span-1">
+        <section className="card p-5">
           <h2 className="section-title">Current program</h2>
           <p className="mt-3 font-semibold text-ink">{program.title}</p>
           <p className="mt-1 text-sm text-ink-muted">{program.role}</p>
           <p className="mt-3 text-sm text-ink-muted">Mentor: {fullName(mentor)}</p>
-          <StatusBadge kind="program" value={program.status} />
+          <div className="mt-3">
+            <StatusBadge kind="program" value={program.status} />
+          </div>
           <Link href="/intern/program" className="mt-4 inline-flex text-sm font-semibold text-brand">
             View program details
           </Link>
         </section>
-
-        <section className="card p-5 lg:col-span-2">
-          <h2 className="section-title">Tasks requiring attention</h2>
-          <ul className="mt-4 space-y-3">
-            {attention.slice(0, 5).map((ta) => {
-              const task = myTasks.find((row) => row.assignment.id === ta.id)?.task;
-              return (
-                <li key={ta.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
-                  <div>
-                    <p className="font-medium text-ink">{task?.title}</p>
-                    <p className="text-xs text-ink-muted">Due {formatDate(ta.deadline)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge kind="task" value={ta.status} />
-                    <Link href={`/intern/tasks/${ta.id}`} className="text-sm font-semibold text-brand">
-                      Open
-                    </Link>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
       </div>
 
       <section className="card mt-6 p-5">
-        <h2 className="section-title">Recent approved feedback & reports</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {recentFeedback.map((ta) => (
-            <div key={ta.id} className="rounded-xl bg-surface-muted p-3 text-sm">
-              <p className="font-medium text-ink">Task feedback</p>
-              <p className="mt-1 text-ink-muted">{ta.mentorFeedback}</p>
-              {typeof ta.score === "number" ? (
-                <p className="mt-2 text-xs font-semibold text-brand">Score {ta.score}/100</p>
-              ) : null}
-            </div>
-          ))}
-          {approvedReports.map((report) => (
-            <Link
-              key={report.id}
-              href={`/intern/reports/${report.id}`}
-              className="rounded-xl border border-line p-3 text-sm transition hover:border-brand/40"
-            >
-              <p className="font-medium text-ink">Approved week {report.weekNumber} report</p>
-              <p className="mt-1 text-ink-muted">{report.content.performanceSummary}</p>
-            </Link>
-          ))}
-        </div>
+        <h2 className="section-title">Tasks requiring attention</h2>
+        <ul className="mt-4 space-y-3">
+          {attention.slice(0, 5).map((ta) => {
+            const task = myTasks.find((row) => row.assignment.id === ta.id)?.task;
+            return (
+              <li key={ta.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
+                <div>
+                  <p className="font-medium text-ink">{task?.title}</p>
+                  <p className="text-xs text-ink-muted">Due {formatDate(ta.deadline)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge kind="task" value={ta.status} />
+                  <Link href={`/intern/tasks/${ta.id}`} className="text-sm font-semibold text-brand">
+                    Open
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </section>
     </div>
   );

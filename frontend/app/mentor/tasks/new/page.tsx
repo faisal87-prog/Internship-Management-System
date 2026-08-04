@@ -3,20 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { ResourceManager } from "@/components/resources/ResourceManager";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
 import { fullName, getUser, internProfiles, programs } from "@/mock/data";
+import type { LearningResource } from "@/types";
 
 export default function CreateTaskPage() {
   const { user } = useMockAuth();
   const router = useRouter();
   const myPrograms = programs.filter((p) => p.mentorId === user?.id);
   const myInterns = internProfiles.filter((ip) => ip.mentorId === user?.id);
+  const [resources, setResources] = useState<LearningResource[]>([]);
   const [message, setMessage] = useState("");
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setMessage("Mock manual task created and assigned. Each selected intern gets a separate TaskAssignment.");
+    setMessage(
+      `Mock manual task created with ${resources.length} resource(s). Each selected intern gets a separate TaskAssignment.`,
+    );
     setTimeout(() => router.push("/mentor/tasks"), 1100);
   }
 
@@ -24,10 +29,10 @@ export default function CreateTaskPage() {
     <div>
       <PageHeader
         title="Create task manually"
-        description="Mentors can create tasks and assign one task to multiple interns."
+        description="Mentors can create tasks, attach learning resources, and assign one task to multiple interns."
         actions={<Link href="/mentor/tasks" className="btn-secondary">Cancel</Link>}
       />
-      <form onSubmit={onSubmit} className="card mx-auto max-w-2xl space-y-4 p-6">
+      <form onSubmit={onSubmit} className="card mx-auto max-w-3xl space-y-4 p-6">
         <div>
           <label className="label" htmlFor="programId">Program</label>
           <select id="programId" className="input" required>
@@ -42,7 +47,13 @@ export default function CreateTaskPage() {
         </div>
         <div>
           <label className="label" htmlFor="description">Description</label>
-          <textarea id="description" className="input" rows={3} required />
+          <textarea
+            id="description"
+            className="input"
+            rows={5}
+            required
+            placeholder="Detailed explanation of what the intern is expected to complete."
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -54,11 +65,11 @@ export default function CreateTaskPage() {
             <input id="estimatedTime" className="input" />
           </div>
           <div>
-            <label className="label" htmlFor="deadline">Deadline</label>
+            <label className="label" htmlFor="deadline">Due date</label>
             <input id="deadline" type="date" className="input" required />
           </div>
           <div>
-            <label className="label" htmlFor="requirementType">Requirement</label>
+            <label className="label" htmlFor="requirementType">Required or optional</label>
             <select id="requirementType" className="input" defaultValue="REQUIRED">
               <option value="REQUIRED">Required</option>
               <option value="OPTIONAL">Optional</option>
@@ -66,7 +77,7 @@ export default function CreateTaskPage() {
           </div>
         </div>
         <div>
-          <label className="label" htmlFor="deliverable">Deliverable</label>
+          <label className="label" htmlFor="deliverable">Deliverables</label>
           <input id="deliverable" className="input" />
         </div>
         <div>
@@ -86,6 +97,11 @@ export default function CreateTaskPage() {
             })}
           </select>
         </div>
+
+        <div className="border-t border-line pt-4">
+          <ResourceManager resources={resources} onChange={setResources} />
+        </div>
+
         {message ? (
           <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
         ) : null}

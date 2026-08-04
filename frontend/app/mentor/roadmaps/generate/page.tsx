@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { ProgramSummary } from "@/components/programs/ProgramSummary";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
-import { fullName, getUser, internProfiles, programs } from "@/mock/data";
+import { fullName, getProgram, getUser, internProfiles, programs } from "@/mock/data";
 
 export default function GenerateRoadmapPage() {
   const { user } = useMockAuth();
@@ -14,6 +15,7 @@ export default function GenerateRoadmapPage() {
   const [scope, setScope] = useState<"PROGRAM" | "GROUP" | "INDIVIDUAL">("PROGRAM");
   const [programId, setProgramId] = useState(myPrograms[0]?.id ?? "");
   const [message, setMessage] = useState("");
+  const selectedProgram = getProgram(programId);
   const interns = internProfiles.filter(
     (ip) => ip.mentorId === user?.id && ip.programId === programId,
   );
@@ -48,6 +50,12 @@ export default function GenerateRoadmapPage() {
             ))}
           </select>
         </div>
+        {selectedProgram ? (
+          <div className="rounded-xl border border-line bg-surface-muted/70 p-4">
+            <p className="mb-2 text-sm font-semibold text-ink">Program summary</p>
+            <ProgramSummary program={selectedProgram} compact />
+          </div>
+        ) : null}
         <fieldset>
           <legend className="label">Roadmap scope</legend>
           <div className="space-y-2">

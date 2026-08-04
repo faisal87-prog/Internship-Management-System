@@ -57,7 +57,7 @@ export default function NewProgramPage() {
             <input id="weeklyHours" type="number" min={1} required className="input" />
           </div>
           <div>
-            <label className="label" htmlFor="maxInterns">Maximum interns</label>
+            <label className="label" htmlFor="maxInterns">Maximum number of interns</label>
             <input id="maxInterns" type="number" min={1} required className="input" />
           </div>
           <div>
@@ -65,9 +65,6 @@ export default function NewProgramPage() {
             <select id="status" className="input" defaultValue="DRAFT">
               <option value="DRAFT">Draft</option>
               <option value="ACTIVE">Active</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
         </div>

@@ -118,8 +118,15 @@ export function AppShell({
                 <p className="text-sm font-medium text-ink">{fullName(user)}</p>
                 <p className="text-xs text-ink-muted">{user.email}</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={logout}>
-                Switch user
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+              >
+                Sign out
               </button>
             </div>
           </div>

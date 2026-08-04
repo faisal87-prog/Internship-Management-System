@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { ResourceList } from "@/components/resources/ResourceList";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { inferResourceKind, MOCK_PDF_HREF } from "@/lib/resources";
 import { getProgram, referenceMaterials as initial } from "@/mock/data";
 import type { ReferenceMaterial } from "@/types";
 
@@ -24,9 +26,10 @@ export default function ProgramMaterialsPage() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const title = String(form.get("title") || "");
-    const externalLink = String(form.get("externalLink") || "");
+    const externalLink = String(form.get("externalLink") || "").trim();
     const file = form.get("file");
     const fileName = file instanceof File && file.name ? file.name : undefined;
+    const href = externalLink || MOCK_PDF_HREF;
     setItems((prev) => [
       ...prev,
       {
@@ -34,7 +37,8 @@ export default function ProgramMaterialsPage() {
         programId: params.id,
         title,
         fileName,
-        externalLink: externalLink || undefined,
+        kind: inferResourceKind(fileName, href),
+        href,
       },
     ]);
     setMessage("Mock reference material added (not uploaded to a server).");
@@ -78,18 +82,12 @@ export default function ProgramMaterialsPage() {
           description="Add PDFs, documents, presentations, or links to support roadmap generation."
         />
       ) : (
-        <ul className="space-y-3">
-          {items.map((item) => (
-            <li key={item.id} className="card flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-ink">{item.title}</p>
-                <p className="text-sm text-ink-muted">
-                  {item.fileName || item.externalLink || "No file or link"}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="card p-5">
+          <ResourceList
+            resources={items}
+            onRemove={(id) => setItems((prev) => prev.filter((item) => item.id !== id))}
+          />
+        </div>
       )}
     </div>
   );

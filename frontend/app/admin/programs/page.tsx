@@ -46,16 +46,11 @@ export default function AdminProgramsPage() {
           },
           {
             key: "actions",
-            header: "Admin actions",
+            header: "Actions",
             render: (row) => (
-              <div className="flex flex-wrap gap-2">
-                <Link href={`/admin/programs/${row.id}`} className="btn-secondary px-3 py-1.5 text-xs">
-                  View
-                </Link>
-                <button type="button" className="btn-secondary px-3 py-1.5 text-xs">
-                  {row.status === "ARCHIVED" ? "Archived" : "Archive"}
-                </button>
-              </div>
+              <Link href={`/admin/programs/${row.id}`} className="btn-secondary px-3 py-1.5 text-xs">
+                View
+              </Link>
             ),
           },
         ]}

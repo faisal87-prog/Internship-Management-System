@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { ResourceManager } from "@/components/resources/ResourceManager";
+import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDate } from "@/lib/labels";
@@ -14,16 +16,30 @@ import {
   taskAssignments,
   tasks,
 } from "@/mock/data";
+import type { LearningResource } from "@/types";
 
 export default function MentorTaskAssignmentPage() {
   const params = useParams<{ assignmentId: string }>();
   const assignment = taskAssignments.find((ta) => ta.id === params.assignmentId);
+  const task = tasks.find((t) => t.id === assignment?.taskId);
   const [deadline, setDeadline] = useState(assignment?.deadline ?? "");
+  const [resources, setResources] = useState<LearningResource[]>(task?.resources ?? []);
   const [message, setMessage] = useState("");
 
-  if (!assignment) return <p>Assignment not found.</p>;
+  const assignedInternNames = useMemo(() => {
+    if (!task) return [];
+    return taskAssignments
+      .filter((ta) => ta.taskId === task.id)
+      .map((ta) => {
+        const intern = getUser(
+          internProfiles.find((ip) => ip.id === ta.internProfileId)?.userId ?? "",
+        );
+        return intern ? fullName(intern) : ta.internProfileId;
+      });
+  }, [task]);
 
-  const task = tasks.find((t) => t.id === assignment.taskId);
+  if (!assignment || !task) return <p>Assignment not found.</p>;
+
   const intern = getUser(
     internProfiles.find((ip) => ip.id === assignment.internProfileId)?.userId ?? "",
   );
@@ -37,8 +53,8 @@ export default function MentorTaskAssignmentPage() {
   return (
     <div>
       <PageHeader
-        title={task?.title ?? "Task assignment"}
-        description="Per-intern assignment tracking with deadline management."
+        title={task.title}
+        description="Task details, learning resources, and per-intern assignment tracking."
         actions={
           <>
             <Link href="/mentor/tasks" className="btn-secondary">Back to board</Link>
@@ -52,21 +68,37 @@ export default function MentorTaskAssignmentPage() {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="card space-y-3 p-5 lg:col-span-2">
-          <StatusBadge kind="task" value={assignment.status} />
-          <p className="text-sm text-ink">{task?.description}</p>
-          <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-            <div>
-              <dt className="font-semibold text-ink-muted">Intern</dt>
-              <dd>{intern ? fullName(intern) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-ink-muted">Week</dt>
-              <dd>{task?.weekNumber}</dd>
-            </div>
+        <section className="card space-y-4 p-5 lg:col-span-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge kind="task" value={assignment.status} />
+            <span className="text-sm text-ink-muted">
+              Viewing assignment for {intern ? fullName(intern) : "intern"} · Week {task.weekNumber}
+            </span>
+          </div>
+
+          <TaskDetailsPanel
+            task={task}
+            dueDate={deadline || assignment.deadline}
+            assignedInternNames={assignedInternNames}
+            resources={resources}
+            resourcesSlot={
+              <ResourceManager
+                title="Task Resources"
+                resources={resources}
+                onChange={(next) => {
+                  setResources(next);
+                  setMessage("Mock task resources updated.");
+                }}
+              />
+            }
+          />
+
+          <dl className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2 text-sm">
             <div>
               <dt className="font-semibold text-ink-muted">Score</dt>
-              <dd>{typeof assignment.score === "number" ? `${assignment.score}/100` : "Not scored"}</dd>
+              <dd>
+                {typeof assignment.score === "number" ? `${assignment.score}/100` : "Not scored"}
+              </dd>
             </div>
             <div>
               <dt className="font-semibold text-ink-muted">Feedback</dt>
