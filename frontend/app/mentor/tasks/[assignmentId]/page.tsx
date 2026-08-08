@@ -2,53 +2,151 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
-import { ResourceManager } from "@/components/resources/ResourceManager";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  PendingLearningResource,
+  ResourceManager,
+} from "@/components/resources/ResourceManager";
 import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatDate } from "@/lib/labels";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import { listSubmissions } from "@/lib/api/submissions";
 import {
-  fullName,
-  getUser,
-  internProfiles,
-  submissions,
-  taskAssignments,
-  tasks,
-} from "@/mock/data";
-import type { LearningResource } from "@/types";
+  createTaskResource,
+  deleteTaskResource,
+  getAssignment,
+  listAssignments,
+  listTaskResources,
+  updateAssignment,
+} from "@/lib/api/tasks";
+import { formatDate } from "@/lib/labels";
+import { fullName } from "@/lib/names";
+import type { LearningResource, Submission, Task, TaskAssignment } from "@/types";
 
 export default function MentorTaskAssignmentPage() {
   const params = useParams<{ assignmentId: string }>();
-  const assignment = taskAssignments.find((ta) => ta.id === params.assignmentId);
-  const task = tasks.find((t) => t.id === assignment?.taskId);
-  const [deadline, setDeadline] = useState(assignment?.deadline ?? "");
-  const [resources, setResources] = useState<LearningResource[]>(task?.resources ?? []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<TaskAssignment | null>(null);
+  const [task, setTask] = useState<Task | null>(null);
+  const [internName, setInternName] = useState("Intern");
+  const [assignedInternNames, setAssignedInternNames] = useState<string[]>([]);
+  const [deadline, setDeadline] = useState("");
+  const [resources, setResources] = useState<PendingLearningResource[]>([]);
+  const [subs, setSubs] = useState<Submission[]>([]);
   const [message, setMessage] = useState("");
+  const [savingDeadline, setSavingDeadline] = useState(false);
 
-  const assignedInternNames = useMemo(() => {
-    if (!task) return [];
-    return taskAssignments
-      .filter((ta) => ta.taskId === task.id)
-      .map((ta) => {
-        const intern = getUser(
-          internProfiles.find((ip) => ip.id === ta.internProfileId)?.userId ?? "",
-        );
-        return intern ? fullName(intern) : ta.internProfileId;
-      });
-  }, [task]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [{ assignment: assign, task: nestedTask, raw }, allAssigns, interns, submissions] =
+        await Promise.all([
+          getAssignment(params.assignmentId),
+          listAssignments(),
+          listInternProfiles(),
+          listSubmissions(params.assignmentId),
+        ]);
+      setAssignment(assign);
+      const resolvedTask = nestedTask;
+      setTask(resolvedTask);
+      setDeadline(assign.deadline?.slice(0, 10) || "");
+      const intern = interns.find((ip) => ip.id === assign.internProfileId);
+      setInternName(intern ? fullName(intern.user) : raw.intern_name || "Intern");
 
-  if (!assignment || !task) return <p>Assignment not found.</p>;
+      if (resolvedTask) {
+        const taskResources = await listTaskResources(resolvedTask.id);
+        setResources(taskResources.length ? taskResources : resolvedTask.resources || []);
+        const names = allAssigns
+          .filter((ta) => ta.taskId === resolvedTask.id)
+          .map((ta) => {
+            const ip = interns.find((row) => row.id === ta.internProfileId);
+            return ip ? fullName(ip.user) : ta.internProfileId;
+          });
+        setAssignedInternNames(names);
+      } else {
+        setResources([]);
+        setAssignedInternNames([]);
+      }
+      setSubs(submissions);
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load assignment."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.assignmentId]);
 
-  const intern = getUser(
-    internProfiles.find((ip) => ip.id === assignment.internProfileId)?.userId ?? "",
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const canReview = useMemo(
+    () =>
+      assignment?.status === "SUBMITTED" || assignment?.status === "NEEDS_REVISION",
+    [assignment?.status],
   );
-  const subs = submissions.filter((s) => s.taskAssignmentId === assignment.id);
 
-  function saveDeadline(e: FormEvent) {
+  async function saveDeadline(e: FormEvent) {
     e.preventDefault();
-    setMessage("Mock deadline updated after assignment.");
+    if (!assignment) return;
+    setSavingDeadline(true);
+    setMessage("");
+    try {
+      const updated = await updateAssignment(assignment.id, {
+        due_date_override: deadline || null,
+      });
+      setAssignment(updated);
+      setMessage("Deadline updated.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not update deadline."));
+    } finally {
+      setSavingDeadline(false);
+    }
   }
+
+  async function onAddResource(input: {
+    title: string;
+    externalLink: string;
+    files: File[];
+  }): Promise<LearningResource[]> {
+    if (!task) return [];
+    const created: LearningResource[] = [];
+    if (input.files.length) {
+      for (const file of input.files) {
+        created.push(
+          await createTaskResource({
+            task: Number(task.id),
+            title: input.title || file.name,
+            file,
+            external_url: input.externalLink || undefined,
+          }),
+        );
+      }
+    } else {
+      created.push(
+        await createTaskResource({
+          task: Number(task.id),
+          title: input.title || input.externalLink,
+          external_url: input.externalLink || undefined,
+        }),
+      );
+    }
+    setMessage("Task resources updated.");
+    return created;
+  }
+
+  async function onRemoveResource(id: string) {
+    await deleteTaskResource(id);
+    setMessage("Resource removed.");
+  }
+
+  if (loading) return <LoadingState label="Loading assignment…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!assignment || !task) return <p>Assignment not found.</p>;
 
   return (
     <div>
@@ -58,7 +156,7 @@ export default function MentorTaskAssignmentPage() {
         actions={
           <>
             <Link href="/mentor/tasks" className="btn-secondary">Back to board</Link>
-            {assignment.status === "SUBMITTED" || assignment.status === "NEEDS_REVISION" ? (
+            {canReview ? (
               <Link href={`/mentor/reviews/${assignment.id}`} className="btn-primary">
                 Review submission
               </Link>
@@ -72,7 +170,7 @@ export default function MentorTaskAssignmentPage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge kind="task" value={assignment.status} />
             <span className="text-sm text-ink-muted">
-              Viewing assignment for {intern ? fullName(intern) : "intern"} · Week {task.weekNumber}
+              Viewing assignment for {internName} · Week {task.weekNumber}
             </span>
           </div>
 
@@ -85,10 +183,9 @@ export default function MentorTaskAssignmentPage() {
               <ResourceManager
                 title="Task Resources"
                 resources={resources}
-                onChange={(next) => {
-                  setResources(next);
-                  setMessage("Mock task resources updated.");
-                }}
+                onChange={setResources}
+                onAddRequest={onAddResource}
+                onRemoveRequest={onRemoveResource}
               />
             }
           />
@@ -116,7 +213,9 @@ export default function MentorTaskAssignmentPage() {
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
             />
-            <button type="submit" className="btn-secondary w-full">Update deadline</button>
+            <button type="submit" className="btn-secondary w-full" disabled={savingDeadline}>
+              {savingDeadline ? "Updating…" : "Update deadline"}
+            </button>
             {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
             <p className="text-xs text-ink-muted">Current: {formatDate(assignment.deadline)}</p>
           </form>

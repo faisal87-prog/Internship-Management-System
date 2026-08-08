@@ -1,18 +1,51 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { fullName, getUser, internProfiles, weeklyReports } from "@/mock/data";
+import { useAuth } from "@/context/AuthContext";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import { listWeeklyReports } from "@/lib/api/reports";
+import { fullName } from "@/lib/names";
+import type { WeeklyReport } from "@/types";
 
 export default function MentorWeeklyReportsPage() {
-  const { user } = useMockAuth();
-  const myInterns = internProfiles.filter((ip) => ip.mentorId === user?.id);
-  const mine = weeklyReports.filter((r) =>
-    myInterns.some((ip) => ip.id === r.internProfileId),
-  );
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reports, setReports] = useState<WeeklyReport[]>([]);
+  const [internNames, setInternNames] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [ips, weekly] = await Promise.all([listInternProfiles(), listWeeklyReports()]);
+      const myInterns = ips.filter((ip) => ip.mentorId === user?.id);
+      const internIds = new Set(myInterns.map((ip) => ip.id));
+      const names: Record<string, string> = {};
+      myInterns.forEach((ip) => {
+        names[ip.id] = fullName(ip.user) || ip.id;
+      });
+      setInternNames(names);
+      setReports(weekly.filter((r) => internIds.has(r.internProfileId)));
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load weekly reports."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading reports…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   return (
     <div>
@@ -26,7 +59,7 @@ export default function MentorWeeklyReportsPage() {
         }
       />
       <DataTable
-        rows={mine}
+        rows={reports}
         mobileTitle={(row) => `Week ${row.weekNumber}`}
         columns={[
           {
@@ -37,12 +70,7 @@ export default function MentorWeeklyReportsPage() {
           {
             key: "intern",
             header: "Intern",
-            render: (row) => {
-              const u = getUser(
-                myInterns.find((ip) => ip.id === row.internProfileId)?.userId ?? "",
-              );
-              return u ? fullName(u) : "—";
-            },
+            render: (row) => internNames[row.internProfileId] || "—",
           },
           {
             key: "status",

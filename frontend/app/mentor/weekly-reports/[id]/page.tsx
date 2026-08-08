@@ -2,53 +2,144 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { WeeklyScoreCard } from "@/components/reports/WeeklyScoreCard";
-import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
+import { useCallback, useEffect, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { getWeeklyTaskScores } from "@/lib/weeklyScore";
-import { fullName, getUser, internProfiles, weeklyReports } from "@/mock/data";
-import type { AiContentStatus } from "@/types";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import {
+  approveWeeklyReport,
+  downloadWeeklyReportPdf,
+  getWeeklyReport,
+  updateWeeklyReport,
+} from "@/lib/api/reports";
+import { formatScoreOutOf100 } from "@/lib/weeklyScore";
+import { fullName } from "@/lib/names";
+import type { AiContentStatus, WeeklyReport } from "@/types";
+
+type ReportDetail = WeeklyReport & { overallWeeklyScore?: number | null };
 
 export default function WeeklyReportDetailPage() {
   const params = useParams<{ id: string }>();
-  const report = weeklyReports.find((r) => r.id === params.id);
-  const [status, setStatus] = useState<AiContentStatus | undefined>(report?.status);
-  const [summary, setSummary] = useState(report?.content.performanceSummary ?? "");
-  const [achievements, setAchievements] = useState(
-    report?.content.achievements.join("\n") ?? "",
-  );
-  const [learningProgress, setLearningProgress] = useState(
-    report?.content.learningProgress ?? "",
-  );
-  const [productivityAnalysis, setProductivityAnalysis] = useState(
-    report?.content.productivityAnalysis ?? "",
-  );
-  const [recommendedFocusNextWeek, setRecommendedFocusNextWeek] = useState(
-    report?.content.recommendedFocusNextWeek ?? "",
-  );
-  const [mentorNotes, setMentorNotes] = useState(report?.additionalMentorNotes ?? "");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportDetail | null>(null);
+  const [status, setStatus] = useState<AiContentStatus>("DRAFT");
+  const [internName, setInternName] = useState("Intern");
+  const [summary, setSummary] = useState("");
+  const [achievements, setAchievements] = useState("");
+  const [learningProgress, setLearningProgress] = useState("");
+  const [productivityAnalysis, setProductivityAnalysis] = useState("");
+  const [recommendedFocusNextWeek, setRecommendedFocusNextWeek] = useState("");
+  const [mentorNotes, setMentorNotes] = useState("");
+  const [overallScore, setOverallScore] = useState<number | null | undefined>(null);
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const scores = useMemo(
-    () =>
-      report
-        ? getWeeklyTaskScores(report.internProfileId, report.weekNumber)
-        : [],
-    [report],
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [detail, interns] = await Promise.all([
+        getWeeklyReport(params.id),
+        listInternProfiles(),
+      ]);
+      setReport(detail);
+      setStatus(detail.status);
+      setSummary(detail.content.performanceSummary ?? "");
+      setAchievements((detail.content.achievements || []).join("\n"));
+      setLearningProgress(detail.content.learningProgress ?? "");
+      setProductivityAnalysis(detail.content.productivityAnalysis ?? "");
+      setRecommendedFocusNextWeek(detail.content.recommendedFocusNextWeek ?? "");
+      setMentorNotes(detail.additionalMentorNotes ?? "");
+      setOverallScore(detail.overallWeeklyScore);
+      const intern = interns.find((ip) => ip.id === detail.internProfileId);
+      setInternName(intern ? fullName(intern.user) : "Intern");
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load weekly report."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
 
-  if (!report || !status) return <p>Report not found.</p>;
-  const intern = getUser(
-    internProfiles.find((ip) => ip.id === report.internProfileId)?.userId ?? "",
-  );
-  const internName = intern ? fullName(intern) : "Intern";
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   const editable = status === "DRAFT";
 
-  function saveEdits() {
-    setMessage("Mock edits saved to draft (frontend only).");
+  async function saveEdits() {
+    if (!report) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const updated = await updateWeeklyReport(report.id, {
+        performance_summary: summary,
+        achievements: achievements
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+        learning_progress: learningProgress,
+        productivity_analysis: productivityAnalysis,
+        recommended_next_focus: recommendedFocusNextWeek,
+        additional_mentor_notes: mentorNotes,
+      });
+      setReport(updated);
+      setOverallScore(updated.overallWeeklyScore);
+      setStatus(updated.status);
+      setMessage("Edits saved.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not save edits."));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  async function onApprove() {
+    if (!report) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await updateWeeklyReport(report.id, {
+        performance_summary: summary,
+        achievements: achievements
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean),
+        learning_progress: learningProgress,
+        productivity_analysis: productivityAnalysis,
+        recommended_next_focus: recommendedFocusNextWeek,
+        additional_mentor_notes: mentorNotes,
+      });
+      const approved = await approveWeeklyReport(report.id);
+      setReport({ ...report, ...approved });
+      setStatus(approved.status);
+      setMessage("Report approved. It is now visible to the intern.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not approve report."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDownload() {
+    if (!report) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await downloadWeeklyReportPdf(report.id);
+      setMessage("PDF download started.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not download PDF."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Loading report…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!report) return <p>Report not found.</p>;
 
   return (
     <div>
@@ -58,10 +149,14 @@ export default function WeeklyReportDetailPage() {
         actions={
           <>
             {status === "APPROVED" ? (
-              <DownloadPdfButton
-                fileName={`week-${report.weekNumber}-report.pdf`}
-                label="Download PDF"
-              />
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void onDownload()}
+                disabled={busy}
+              >
+                Download PDF
+              </button>
             ) : null}
             <Link href="/mentor/weekly-reports" className="btn-secondary">Back</Link>
           </>
@@ -78,26 +173,25 @@ export default function WeeklyReportDetailPage() {
         <button
           type="button"
           className="btn-secondary"
-          onClick={() =>
-            setMessage(
-              "Mock regenerate requested. Draft content would be replaced after validation.",
-            )
-          }
+          onClick={() => setMessage("AI generation is not connected yet.")}
         >
           Regenerate
         </button>
         {editable ? (
           <>
-            <button type="button" className="btn-secondary" onClick={saveEdits}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void saveEdits()}
+              disabled={busy}
+            >
               Save edits
             </button>
             <button
               type="button"
               className="btn-primary"
-              onClick={() => {
-                setStatus("APPROVED");
-                setMessage("Report approved. It is now visible to the intern.");
-              }}
+              onClick={() => void onApprove()}
+              disabled={busy}
             >
               Approve report
             </button>
@@ -108,9 +202,18 @@ export default function WeeklyReportDetailPage() {
         <p className="mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
       ) : null}
 
-      <div className="mb-4">
-        <WeeklyScoreCard scores={scores} />
-      </div>
+      <section className="mb-4 rounded-xl border border-brand/30 bg-brand-soft/70 p-4">
+        <h2 className="section-title">Overall Weekly Score</h2>
+        {typeof overallScore === "number" ? (
+          <p className="mt-2 text-3xl font-bold text-brand-dark">
+            {formatScoreOutOf100(overallScore)}
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-ink-muted">
+            No scored tasks available for this week.
+          </p>
+        )}
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card space-y-3 p-5">
@@ -187,7 +290,12 @@ export default function WeeklyReportDetailPage() {
             />
           </div>
           {editable ? (
-            <button type="button" className="btn-secondary" onClick={saveEdits}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void saveEdits()}
+              disabled={busy}
+            >
               Save edits
             </button>
           ) : null}

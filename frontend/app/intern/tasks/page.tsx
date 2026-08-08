@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { getInternContext } from "@/lib/intern";
+import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/lib/api/errors";
+import { getInternContext, type InternContext } from "@/lib/intern";
 import { formatDate, taskStatusLabel } from "@/lib/labels";
 import type { TaskStatus } from "@/types";
 
@@ -16,8 +19,35 @@ const columns: TaskStatus[] = [
 ];
 
 export default function InternTasksPage() {
-  const { user } = useMockAuth();
-  const ctx = user ? getInternContext(user.id) : null;
+  const { user } = useAuth();
+  const [ctx, setCtx] = useState<InternContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setCtx(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setCtx(await getInternContext(user.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to load tasks."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading tasks…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+
   const assignments = ctx?.assignments ?? [];
   const myTasks = ctx?.myTasks ?? [];
 

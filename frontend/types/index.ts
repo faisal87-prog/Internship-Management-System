@@ -108,6 +108,8 @@ export interface RoadmapTaskDraft {
 }
 
 export interface RoadmapWeek {
+  /** Present when loaded/saved via API */
+  id?: string;
   weekNumber: number;
   weeklyFocus: string;
   weeklyLearningObjectives: string[];

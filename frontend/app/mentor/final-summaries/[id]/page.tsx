@@ -2,47 +2,168 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FinalSummaryContent } from "@/components/final-summary/FinalSummaryContent";
-import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { finalSummaries, fullName, getUser, internProfiles } from "@/mock/data";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import {
+  approveFinalSummary,
+  downloadFinalSummaryPdf,
+  getFinalSummary,
+  updateFinalSummary,
+} from "@/lib/api/reports";
+import { fullName } from "@/lib/names";
 import type { AiContentStatus, FinalSummary } from "@/types";
 
 export default function FinalSummaryDetailPage() {
   const params = useParams<{ id: string }>();
-  const summary = finalSummaries.find((fs) => fs.id === params.id);
-  const [status, setStatus] = useState<AiContentStatus | undefined>(summary?.status);
-  const [content, setContent] = useState<FinalSummary["content"] | undefined>(
-    summary?.content,
-  );
-  const [score, setScore] = useState(summary?.mentorFinalScore?.toString() ?? "");
-  const [comments, setComments] = useState(summary?.mentorFinalComments ?? "");
-  const [mentorNotes, setMentorNotes] = useState(summary?.additionalMentorNotes ?? "");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<FinalSummary | null>(null);
+  const [status, setStatus] = useState<AiContentStatus>("DRAFT");
+  const [content, setContent] = useState<FinalSummary["content"] | null>(null);
+  const [score, setScore] = useState("");
+  const [comments, setComments] = useState("");
+  const [mentorNotes, setMentorNotes] = useState("");
+  const [internName, setInternName] = useState("Intern");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  if (!summary || !status || !content) return <p>Final summary not found.</p>;
-  const intern = getUser(
-    internProfiles.find((ip) => ip.id === summary.internProfileId)?.userId ?? "",
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [detail, interns] = await Promise.all([
+        getFinalSummary(params.id),
+        listInternProfiles(),
+      ]);
+      setSummary(detail);
+      setStatus(detail.status);
+      setContent(detail.content);
+      setScore(detail.mentorFinalScore?.toString() ?? "");
+      setComments(detail.mentorFinalComments ?? "");
+      setMentorNotes(detail.additionalMentorNotes ?? "");
+      const intern = interns.find((ip) => ip.id === detail.internProfileId);
+      setInternName(intern ? fullName(intern.user) : "Intern");
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load final summary."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   const editable = status === "DRAFT";
 
-  function saveEdits() {
-    setMessage("Mock edits saved to draft (frontend only).");
+  async function saveEdits() {
+    if (!summary || !content) return;
+    if (score) {
+      const parsed = Number(score);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
+        setMessage("Final score must be an integer 0–100.");
+        return;
+      }
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const updated = await updateFinalSummary(summary.id, {
+        overall_performance_summary: content.overallPerformanceSummary,
+        learning_journey: content.learningJourney,
+        main_achievements: content.mainAchievements,
+        goal_achievement: content.goalAchievement,
+        final_performance_summary: content.finalPerformanceSummary,
+        final_score: score ? Number(score) : null,
+        mentor_comments: comments,
+        additional_mentor_notes: mentorNotes,
+      });
+      setSummary(updated);
+      setContent(updated.content);
+      setStatus(updated.status);
+      setScore(updated.mentorFinalScore?.toString() ?? "");
+      setComments(updated.mentorFinalComments ?? "");
+      setMentorNotes(updated.additionalMentorNotes ?? "");
+      setMessage("Edits saved.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not save edits."));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  async function onApprove() {
+    if (!summary || !content) return;
+    if (score) {
+      const parsed = Number(score);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
+        setMessage("Final score must be an integer 0–100.");
+        return;
+      }
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      await updateFinalSummary(summary.id, {
+        overall_performance_summary: content.overallPerformanceSummary,
+        learning_journey: content.learningJourney,
+        main_achievements: content.mainAchievements,
+        goal_achievement: content.goalAchievement,
+        final_performance_summary: content.finalPerformanceSummary,
+        final_score: score ? Number(score) : null,
+        mentor_comments: comments,
+        additional_mentor_notes: mentorNotes,
+      });
+      const approved = await approveFinalSummary(summary.id);
+      setSummary(approved);
+      setContent(approved.content);
+      setStatus(approved.status);
+      setMessage("Final summary approved and stored.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not approve summary."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDownload() {
+    if (!summary) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await downloadFinalSummaryPdf(summary.id);
+      setMessage("PDF download started.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not download PDF."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Loading summary…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!summary || !content) return <p>Final summary not found.</p>;
 
   return (
     <div>
       <PageHeader
         title="Final internship summary"
-        description={intern ? fullName(intern) : "Intern"}
+        description={internName}
         actions={
           <>
-            <DownloadPdfButton
-              fileName="final-internship-summary.pdf"
-              label="Download PDF"
-            />
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void onDownload()}
+              disabled={busy}
+            >
+              Download PDF
+            </button>
             <Link href="/mentor/final-summaries" className="btn-secondary">Back</Link>
           </>
         }
@@ -58,29 +179,25 @@ export default function FinalSummaryDetailPage() {
         <button
           type="button"
           className="btn-secondary"
-          onClick={() =>
-            setMessage("Mock regenerate requested. Draft content would be replaced after validation.")
-          }
+          onClick={() => setMessage("AI generation is not connected yet.")}
         >
           Regenerate
         </button>
         {editable ? (
           <>
-            <button type="button" className="btn-secondary" onClick={saveEdits}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void saveEdits()}
+              disabled={busy}
+            >
               Save edits
             </button>
             <button
               type="button"
               className="btn-primary"
-              onClick={() => {
-                const parsed = Number(score);
-                if (score && (!Number.isInteger(parsed) || parsed < 0 || parsed > 100)) {
-                  setMessage("Final score must be an integer 0–100.");
-                  return;
-                }
-                setStatus("APPROVED");
-                setMessage("Final summary approved and stored.");
-              }}
+              onClick={() => void onApprove()}
+              disabled={busy}
             >
               Approve summary
             </button>
@@ -144,7 +261,12 @@ export default function FinalSummaryDetailPage() {
             />
           </div>
           {editable ? (
-            <button type="button" className="btn-secondary" onClick={saveEdits}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void saveEdits()}
+              disabled={busy}
+            >
               Save edits
             </button>
           ) : null}

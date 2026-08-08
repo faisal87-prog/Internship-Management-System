@@ -1,6 +1,5 @@
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDate } from "@/lib/labels";
-import { fullName, getUser } from "@/mock/data";
 import type { InternshipProgram } from "@/types";
 
 function SkillList({ items }: { items: string[] }) {
@@ -23,12 +22,14 @@ export function ProgramSummary({
   program,
   compact = false,
   showStatus = true,
+  mentorName,
 }: {
   program: InternshipProgram;
   compact?: boolean;
   showStatus?: boolean;
+  mentorName?: string;
 }) {
-  const mentor = getUser(program.mentorId);
+  const displayMentor = mentorName || "Mentor";
 
   if (compact) {
     return (
@@ -44,9 +45,7 @@ export function ProgramSummary({
         <p className="text-xs text-ink-muted">
           {formatDate(program.startDate)} – {formatDate(program.endDate)} · {program.weeklyHours} hrs/week
         </p>
-        {mentor ? (
-          <p className="text-xs text-ink-muted">Mentor: {fullName(mentor)}</p>
-        ) : null}
+        <p className="text-xs text-ink-muted">Mentor: {displayMentor}</p>
       </div>
     );
   }
@@ -70,7 +69,7 @@ export function ProgramSummary({
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Mentor</dt>
-          <dd className="mt-1 text-sm text-ink">{mentor ? fullName(mentor) : "—"}</dd>
+          <dd className="mt-1 text-sm text-ink">{displayMentor}</dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Start date</dt>

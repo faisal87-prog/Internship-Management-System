@@ -2,21 +2,34 @@
 
 import { FormEvent, useState } from "react";
 import { ResourceList } from "@/components/resources/ResourceList";
+import { getErrorMessage } from "@/lib/api/errors";
 import { inferResourceKind, MOCK_PDF_HREF } from "@/lib/resources";
 import type { LearningResource } from "@/types";
+
+/** Local pending resource that still holds the File for later upload. */
+export type PendingLearningResource = LearningResource & { file?: File };
 
 export function ResourceManager({
   resources,
   onChange,
   title = "Task resources",
+  onAddRequest,
+  onRemoveRequest,
 }: {
-  resources: LearningResource[];
-  onChange: (next: LearningResource[]) => void;
+  resources: PendingLearningResource[];
+  onChange: (next: PendingLearningResource[]) => void;
   title?: string;
+  onAddRequest?: (input: {
+    title: string;
+    externalLink: string;
+    files: File[];
+  }) => Promise<LearningResource[]>;
+  onRemoveRequest?: (id: string) => Promise<void>;
 }) {
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function onAdd(e: FormEvent<HTMLFormElement>) {
+  async function onAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const resourceTitle = String(form.get("title") || "").trim();
@@ -30,7 +43,26 @@ export function ResourceManager({
       return;
     }
 
-    const next: LearningResource[] = [...resources];
+    if (onAddRequest) {
+      setBusy(true);
+      try {
+        const created = await onAddRequest({
+          title: resourceTitle,
+          externalLink,
+          files,
+        });
+        onChange([...resources, ...created]);
+        setMessage("Resource(s) added.");
+        e.currentTarget.reset();
+      } catch (error) {
+        setMessage(getErrorMessage(error, "Could not add resource."));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    const next: PendingLearningResource[] = [...resources];
 
     if (files.length) {
       files.forEach((file, index) => {
@@ -40,6 +72,7 @@ export function ResourceManager({
           fileName: file.name,
           kind: inferResourceKind(file.name),
           href: MOCK_PDF_HREF,
+          file,
         });
       });
     } else if (externalLink) {
@@ -60,8 +93,25 @@ export function ResourceManager({
     }
 
     onChange(next);
-    setMessage("Mock resources updated (not uploaded to a server).");
+    setMessage("Resources staged. They will upload when you save.");
     e.currentTarget.reset();
+  }
+
+  async function handleRemove(id: string) {
+    if (onRemoveRequest) {
+      setBusy(true);
+      try {
+        await onRemoveRequest(id);
+        onChange(resources.filter((r) => r.id !== id));
+        setMessage("Resource removed.");
+      } catch (error) {
+        setMessage(getErrorMessage(error, "Could not remove resource."));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    onChange(resources.filter((r) => r.id !== id));
   }
 
   return (
@@ -70,14 +120,14 @@ export function ResourceManager({
         <h2 className="section-title">{title}</h2>
         <p className="mt-1 text-sm text-ink-muted">
           Upload PDFs, Word, PowerPoint, images, ZIP, or add external links. Max 20 MB per
-          file (mock).
+          file.
         </p>
       </div>
 
       <ResourceList
         resources={resources}
         emptyLabel="No resources yet. Add files or links below."
-        onRemove={(id) => onChange(resources.filter((r) => r.id !== id))}
+        onRemove={busy ? undefined : handleRemove}
       />
 
       <form onSubmit={onAdd} className="grid gap-3 rounded-xl border border-dashed border-line p-4 md:grid-cols-2">
@@ -113,7 +163,7 @@ export function ResourceManager({
           />
         </div>
         <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-          <button type="submit" className="btn-secondary">
+          <button type="submit" className="btn-secondary" disabled={busy}>
             Add resources
           </button>
           {message ? <p className="text-sm text-emerald-700">{message}</p> : null}

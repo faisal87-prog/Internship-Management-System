@@ -3,43 +3,37 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { useMockAuth } from "@/context/MockAuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { dashboardPath } from "@/lib/navigation";
-import { DEMO_ACCESS_HINT, MOCK_CREDENTIALS } from "@/mock/auth";
-import { users } from "@/mock/data";
 
 export default function LoginPage() {
-  const { user, isReady, login } = useMockAuth();
+  const { user, isReady, login } = useAuth();
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isReady && user) router.replace(dashboardPath(user.role));
   }, [isReady, user, router]);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     if (!identifier.trim() || !password) {
       setError("Please enter both username/email and password.");
       return;
     }
-    const result = login(identifier, password);
+    setSubmitting(true);
+    const result = await login(identifier, password);
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    const lower = identifier.trim().toLowerCase();
-    const cred = MOCK_CREDENTIALS.find((c) =>
-      c.identifiers.some((id) => id.toLowerCase() === lower),
-    );
-    const matchedUser = users.find((u) => u.id === cred?.userId);
-    if (matchedUser) {
-      router.push(dashboardPath(matchedUser.role));
-    }
+    router.push(dashboardPath(result.user.role));
   }
 
   return (
@@ -112,13 +106,13 @@ export default function LoginPage() {
               </p>
             ) : null}
 
-            <button type="submit" className="btn-primary w-full">
-              Sign In
+            <button type="submit" className="btn-primary w-full" disabled={submitting}>
+              {submitting ? "Signing in…" : "Sign In"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-[11px] leading-relaxed text-ink-muted">
-            {DEMO_ACCESS_HINT}
+            Use your platform account credentials provided by Admin.
           </p>
         </div>
       </div>

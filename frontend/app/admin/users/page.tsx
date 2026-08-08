@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataTable } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { deleteUser, listUsers, patchUser } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
 import { roleLabel } from "@/lib/labels";
-import { fullName, users as initialUsers } from "@/mock/data";
+import { fullName } from "@/lib/names";
 import type { User } from "@/types";
 
 type PendingAction =
@@ -15,22 +18,54 @@ type PendingAction =
   | null;
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const rows = useMemo(() => users, [users]);
 
-  function confirmAction() {
-    if (!pending) return;
-    if (pending.type === "delete") {
-      setUsers((prev) => prev.filter((u) => u.id !== pending.user.id));
-    } else {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === pending.user.id ? { ...u, isActive: false } : u,
-        ),
-      );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setUsers(await listUsers());
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to load users."));
+    } finally {
+      setLoading(false);
     }
-    setPending(null);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function confirmAction() {
+    if (!pending) return;
+    setActionError(null);
+    try {
+      if (pending.type === "delete") {
+        await deleteUser(pending.user.id);
+        setUsers((prev) => prev.filter((u) => u.id !== pending.user.id));
+      } else {
+        const updated = await patchUser(pending.user.id, { is_active: false });
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      }
+      setPending(null);
+    } catch (err) {
+      setActionError(getErrorMessage(err, "Unable to update user."));
+    }
+  }
+
+  async function reactivate(user: User) {
+    setActionError(null);
+    try {
+      const updated = await patchUser(user.id, { is_active: true });
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    } catch (err) {
+      setActionError(getErrorMessage(err, "Unable to reactivate user."));
+    }
   }
 
   return (
@@ -45,9 +80,19 @@ export default function AdminUsersPage() {
         }
       />
 
-      {rows.length === 0 ? (
+      {loading ? <LoadingState label="Loading users…" /> : null}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+      {actionError ? (
+        <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          {actionError}
+        </p>
+      ) : null}
+
+      {!loading && !error && rows.length === 0 ? (
         <EmptyState title="No users" description="Create a Mentor or Intern account to get started." />
-      ) : (
+      ) : null}
+
+      {!loading && !error && rows.length > 0 ? (
         <DataTable
           rows={rows}
           mobileTitle={(row) => fullName(row)}
@@ -108,13 +153,7 @@ export default function AdminUsersPage() {
                       <button
                         type="button"
                         className="btn-secondary whitespace-nowrap px-3 py-1.5 text-xs"
-                        onClick={() =>
-                          setUsers((prev) =>
-                            prev.map((u) =>
-                              u.id === row.id ? { ...u, isActive: true } : u,
-                            ),
-                          )
-                        }
+                        onClick={() => void reactivate(row)}
                       >
                         {row.role === "INTERN" ? "Reactivate" : "Activate"}
                       </button>
@@ -131,7 +170,7 @@ export default function AdminUsersPage() {
             },
           ]}
         />
-      )}
+      ) : null}
 
       <ConfirmDialog
         open={pending?.type === "deactivate"}
@@ -144,20 +183,20 @@ export default function AdminUsersPage() {
         confirmLabel="Deactivate"
         danger
         onCancel={() => setPending(null)}
-        onConfirm={confirmAction}
+        onConfirm={() => void confirmAction()}
       />
       <ConfirmDialog
         open={pending?.type === "delete"}
         title="Delete account?"
         description={
           pending
-            ? `Permanently delete ${fullName(pending.user)} from the mock user list? This cannot be undone in this demo.`
+            ? `Permanently delete ${fullName(pending.user)}? This cannot be undone.`
             : ""
         }
         confirmLabel="Delete"
         danger
         onCancel={() => setPending(null)}
-        onConfirm={confirmAction}
+        onConfirm={() => void confirmAction()}
       />
     </div>
   );

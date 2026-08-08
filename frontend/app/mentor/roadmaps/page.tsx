@@ -1,17 +1,52 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useMockAuth } from "@/context/MockAuthContext";
+import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/lib/api/errors";
+import { listPrograms } from "@/lib/api/programs";
+import { listRoadmaps } from "@/lib/api/roadmaps";
 import { roadmapScopeLabel } from "@/lib/labels";
-import { getProgram, programs, roadmaps } from "@/mock/data";
+import type { InternshipProgram, Roadmap } from "@/types";
 
 export default function MentorRoadmapsPage() {
-  const { user } = useMockAuth();
-  const myProgramIds = programs.filter((p) => p.mentorId === user?.id).map((p) => p.id);
-  const mine = roadmaps.filter((r) => myProgramIds.includes(r.programId));
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
+  const [programsById, setProgramsById] = useState<Record<string, InternshipProgram>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [programs, maps] = await Promise.all([listPrograms(), listRoadmaps()]);
+      const myProgramIds = new Set(
+        programs.filter((p) => p.mentorId === user?.id).map((p) => p.id),
+      );
+      const byId: Record<string, InternshipProgram> = {};
+      programs.forEach((p) => {
+        byId[p.id] = p;
+      });
+      setProgramsById(byId);
+      setRoadmaps(maps.filter((r) => myProgramIds.has(r.programId)));
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load roadmaps."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading roadmaps…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   return (
     <div>
@@ -25,7 +60,7 @@ export default function MentorRoadmapsPage() {
         }
       />
       <DataTable
-        rows={mine}
+        rows={roadmaps}
         mobileTitle={(row) => row.title}
         columns={[
           {
@@ -40,7 +75,7 @@ export default function MentorRoadmapsPage() {
           {
             key: "program",
             header: "Program",
-            render: (row) => getProgram(row.programId)?.title ?? "—",
+            render: (row) => programsById[row.programId]?.title ?? "—",
           },
           {
             key: "scope",

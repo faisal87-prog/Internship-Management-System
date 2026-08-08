@@ -2,12 +2,22 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { InternChipPicker } from "@/components/interns/InternChips";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RoadmapWeekCard } from "@/components/roadmaps/RoadmapWeekView";
-import { fullName, getUser, internProfiles, programs, roadmaps as seedRoadmaps } from "@/mock/data";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import { getProgram } from "@/lib/api/programs";
+import {
+  createRoadmapWeek,
+  getRoadmap,
+  updateRoadmap,
+  updateRoadmapWeek,
+} from "@/lib/api/roadmaps";
+import { fullName } from "@/lib/names";
 import type { Roadmap, RoadmapScope, RoadmapTaskDraft, RoadmapWeek } from "@/types";
 
 function newId(prefix: string) {
@@ -44,11 +54,13 @@ function emptyWeek(weekNumber: number): RoadmapWeek {
 export default function EditRoadmapPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const seed = seedRoadmaps.find((r) => r.id === params.id);
-  const [roadmap, setRoadmap] = useState<Roadmap | undefined>(
-    seed ? structuredClone(seed) : undefined,
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [programTitle, setProgramTitle] = useState("");
+  const [internOptions, setInternOptions] = useState<{ id: string; name: string }[]>([]);
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   const [editingTask, setEditingTask] = useState<{
     weekNumber: number;
     task: RoadmapTaskDraft;
@@ -59,14 +71,34 @@ export default function EditRoadmapPage() {
     | null
   >(null);
 
-  const programInterns = useMemo(() => {
-    if (!roadmap) return [];
-    return internProfiles.filter((ip) => ip.programId === roadmap.programId);
-  }, [roadmap]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const map = await getRoadmap(params.id);
+      setRoadmap(map);
+      const [program, interns] = await Promise.all([
+        getProgram(map.programId).catch(() => null),
+        listInternProfiles(),
+      ]);
+      setProgramTitle(program?.title ?? "");
+      setInternOptions(
+        interns
+          .filter((ip) => ip.programId === map.programId)
+          .map((ip) => ({ id: ip.id, name: fullName(ip.user) || ip.id })),
+      );
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load roadmap."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
 
-  if (!roadmap) return <p>Roadmap not found.</p>;
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const program = programs.find((p) => p.id === roadmap.programId);
+  const programInterns = useMemo(() => internOptions, [internOptions]);
 
   function updateWeek(weekNumber: number, updater: (week: RoadmapWeek) => RoadmapWeek) {
     setRoadmap((prev) => {
@@ -157,14 +189,70 @@ export default function EditRoadmapPage() {
       ),
     }));
     setEditingTask(null);
-    setMessage("Task updated in mock state.");
+    setMessage("Task updated locally. Nested roadmap tasks are not persisted via the week API.");
   }
+
+  async function saveDraft() {
+    if (!roadmap) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      const updated = await updateRoadmap(roadmap.id, {
+        title: roadmap.title,
+        summary: roadmap.summary,
+        assignment_scope: roadmap.scope,
+        number_of_weeks: roadmap.numberOfWeeks,
+        assigned_intern_ids:
+          roadmap.scope === "PROGRAM" ? [] : roadmap.assignedInternIds.map(Number),
+      });
+
+      const weeks = [...roadmap.weeks];
+      for (let i = 0; i < weeks.length; i += 1) {
+        const week = weeks[i];
+        const payload = {
+          week_number: week.weekNumber,
+          weekly_focus: week.weeklyFocus,
+          learning_objectives: week.weeklyLearningObjectives,
+          expected_skills_gained: week.expectedSkillsGained,
+          mentor_notes: week.mentorNotes || "",
+          display_order: week.weekNumber,
+        };
+        if (week.id) {
+          const saved = await updateRoadmapWeek(week.id, payload);
+          weeks[i] = { ...week, ...saved, id: week.id };
+        } else {
+          const created = await createRoadmapWeek({
+            roadmap: Number(roadmap.id),
+            ...payload,
+          });
+          weeks[i] = { ...week, ...created, id: created.id ?? week.id };
+        }
+      }
+
+      const refreshed = await getRoadmap(roadmap.id);
+      setRoadmap({
+        ...updated,
+        ...refreshed,
+        weeks: refreshed.weeks.length ? refreshed.weeks : weeks,
+      });
+      setMessage("Draft roadmap saved.");
+      router.push(`/mentor/roadmaps/${roadmap.id}`);
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not save roadmap."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Loading roadmap…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!roadmap) return <p>Roadmap not found.</p>;
 
   return (
     <div>
       <PageHeader
         title="Edit roadmap"
-        description="Edit roadmap, week, and task structure using mock state. Drag-and-drop is not required."
+        description="Edit roadmap and week fields. Save persists roadmap metadata and week content to the API."
         actions={
           <Link href={`/mentor/roadmaps/${roadmap.id}`} className="btn-secondary">
             Back
@@ -180,8 +268,8 @@ export default function EditRoadmapPage() {
 
       <section className="card mb-6 space-y-4 p-5">
         <h2 className="section-title">Roadmap details</h2>
-        {program ? (
-          <p className="text-sm text-ink-muted">Program: {program.title}</p>
+        {programTitle ? (
+          <p className="text-sm text-ink-muted">Program: {programTitle}</p>
         ) : null}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -251,10 +339,7 @@ export default function EditRoadmapPage() {
 
         {roadmap.scope !== "PROGRAM" ? (
           <InternChipPicker
-            options={programInterns.map((ip) => {
-              const user = getUser(ip.userId);
-              return { id: ip.id, name: user ? fullName(user) : ip.id };
-            })}
+            options={programInterns}
             selectedIds={roadmap.assignedInternIds}
             onChange={(ids) =>
               setRoadmap((prev) => (prev ? { ...prev, assignedInternIds: ids } : prev))
@@ -281,7 +366,7 @@ export default function EditRoadmapPage() {
             type="button"
             className="btn-secondary"
             onClick={() =>
-              setMessage("Mock regenerate requested. Draft content would be replaced after validation.")
+              setMessage("AI generation is not connected yet.")
             }
           >
             Regenerate entire roadmap
@@ -289,12 +374,10 @@ export default function EditRoadmapPage() {
           <button
             type="button"
             className="btn-primary"
-            onClick={() => {
-              setMessage("Mock roadmap draft saved.");
-              setTimeout(() => router.push(`/mentor/roadmaps/${roadmap.id}`), 800);
-            }}
+            disabled={saving}
+            onClick={() => void saveDraft()}
           >
-            Save draft
+            {saving ? "Saving…" : "Save draft"}
           </button>
         </div>
       </section>
@@ -302,7 +385,7 @@ export default function EditRoadmapPage() {
       <div className="space-y-4">
         {roadmap.weeks.map((week) => (
           <RoadmapWeekCard
-            key={week.weekNumber}
+            key={week.id ?? week.weekNumber}
             week={week}
             readOnly={false}
             actions={
@@ -388,11 +471,10 @@ export default function EditRoadmapPage() {
         ))}
       </div>
 
-      {/* Week field editors under each week card via expand panels */}
       <section className="card mt-6 space-y-4 p-5">
         <h2 className="section-title">Week content editors</h2>
         {roadmap.weeks.map((week) => (
-          <div key={`edit-${week.weekNumber}`} className="rounded-xl border border-line p-4">
+          <div key={`edit-${week.id ?? week.weekNumber}`} className="rounded-xl border border-line p-4">
             <p className="font-semibold text-ink">Week {week.weekNumber}</p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="md:col-span-2">
@@ -521,10 +603,7 @@ export default function EditRoadmapPage() {
                 </select>
               </div>
               <InternChipPicker
-                options={programInterns.map((ip) => {
-                  const user = getUser(ip.userId);
-                  return { id: ip.id, name: user ? fullName(user) : ip.id };
-                })}
+                options={programInterns}
                 selectedIds={editingTask.task.assignedInternIds ?? []}
                 onChange={(ids) =>
                   setEditingTask({
@@ -550,7 +629,7 @@ export default function EditRoadmapPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={deleteTarget?.type === "week" ? "Delete week?" : "Delete task?"}
-        description="This mock deletion updates local state only and cannot be undone in this demo session."
+        description="This removes the item from the editor. Week deletions are applied on Save only for newly created weeks; existing API weeks keep their records unless removed server-side."
         confirmLabel="Delete"
         danger
         onCancel={() => setDeleteTarget(null)}

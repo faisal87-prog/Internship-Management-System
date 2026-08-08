@@ -2,48 +2,100 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ResourceList } from "@/components/resources/ResourceList";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { inferResourceKind, MOCK_PDF_HREF } from "@/lib/resources";
-import { getProgram, referenceMaterials as initial } from "@/mock/data";
-import type { ReferenceMaterial } from "@/types";
+import { getErrorMessage } from "@/lib/api/errors";
+import {
+  createProgramMaterial,
+  deleteProgramMaterial,
+  getProgram,
+  listProgramMaterials,
+} from "@/lib/api/programs";
+import type { InternshipProgram, ReferenceMaterial } from "@/types";
 
 const ALLOWED = "PDF, DOC, DOCX, PPT, PPTX, PNG, JPG, JPEG, TXT, CSV, ZIP · max 20 MB";
 
 export default function ProgramMaterialsPage() {
   const params = useParams<{ id: string }>();
-  const program = getProgram(params.id);
-  const [items, setItems] = useState<ReferenceMaterial[]>(
-    initial.filter((m) => m.programId === params.id),
-  );
+  const [program, setProgram] = useState<InternshipProgram | null>(null);
+  const [items, setItems] = useState<ReferenceMaterial[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  if (!program) return <p>Program not found.</p>;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [prog, materials] = await Promise.all([
+        getProgram(params.id),
+        listProgramMaterials(params.id),
+      ]);
+      setProgram(prog);
+      setItems(materials);
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load materials."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!program) return;
     const form = new FormData(e.currentTarget);
     const title = String(form.get("title") || "");
     const externalLink = String(form.get("externalLink") || "").trim();
-    const file = form.get("file");
-    const fileName = file instanceof File && file.name ? file.name : undefined;
-    const href = externalLink || MOCK_PDF_HREF;
-    setItems((prev) => [
-      ...prev,
-      {
-        id: `rm-local-${prev.length + 1}`,
-        programId: params.id,
+    const fileField = form.get("file");
+    const file = fileField instanceof File && fileField.name ? fileField : null;
+    if (!file && !externalLink) {
+      setMessage("Provide a file or an external link.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const created = await createProgramMaterial({
+        program: Number(program.id),
         title,
-        fileName,
-        kind: inferResourceKind(fileName, href),
-        href,
-      },
-    ]);
-    setMessage("Mock reference material added (not uploaded to a server).");
-    e.currentTarget.reset();
+        external_url: externalLink || undefined,
+        file,
+      });
+      setItems((prev) => [...prev, created]);
+      setMessage("Reference material added.");
+      e.currentTarget.reset();
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not add material."));
+    } finally {
+      setBusy(false);
+    }
   }
+
+  async function onRemove(id: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await deleteProgramMaterial(id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setMessage("Material removed.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not remove material."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Loading materials…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!program) return <p>Program not found.</p>;
 
   return (
     <div>
@@ -71,7 +123,9 @@ export default function ProgramMaterialsPage() {
           <input id="externalLink" name="externalLink" type="url" className="input" placeholder="https://" />
         </div>
         <div className="md:col-span-2">
-          <button type="submit" className="btn-primary">Add material</button>
+          <button type="submit" className="btn-primary" disabled={busy}>
+            Add material
+          </button>
           {message ? <p className="mt-2 text-sm text-emerald-700">{message}</p> : null}
         </div>
       </form>
@@ -85,7 +139,7 @@ export default function ProgramMaterialsPage() {
         <div className="card p-5">
           <ResourceList
             resources={items}
-            onRemove={(id) => setItems((prev) => prev.filter((item) => item.id !== id))}
+            onRemove={busy ? undefined : onRemove}
           />
         </div>
       )}

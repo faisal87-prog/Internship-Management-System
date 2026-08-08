@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import { MockAuthProvider } from "@/context/MockAuthContext";
+import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
 const sans = Plus_Jakarta_Sans({
@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${sans.variable} font-sans`}>
-        <MockAuthProvider>{children}</MockAuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

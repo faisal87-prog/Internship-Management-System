@@ -1,34 +1,41 @@
 # Backend
 
-> **Status:** Not implemented. Placeholder structure only.
+Django + Django REST Framework API for the AI Internship Management Platform.
 
-Django backend with Django REST Framework (to be added during implementation).
+## Setup
 
-## Planned Structure
-
-```
-backend/
-├── config/        # Django project settings (not implemented)
-├── apps/
-│   ├── accounts/      # Users, roles, authentication
-│   ├── programs/      # Internship programs, intern profiles, skills
-│   ├── roadmaps/      # Roadmap generation and publishing
-│   ├── tasks/         # Tasks and task assignments
-│   ├── submissions/   # Submissions and mentor reviews
-│   └── reports/       # Weekly reports and final summaries
-├── services/      # Business logic services (not implemented)
-├── permissions/   # Role-based permissions (not implemented)
-├── common/        # Shared utilities (not implemented)
-└── tests/         # Test suite (not implemented)
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_data
+python manage.py runserver
 ```
 
-## Rules
+Development uses SQLite by default. Set `DATABASE_NAME` (and related vars) in `.env` to use PostgreSQL.
 
-- All AI requests go through Django backend
-- OpenAI API key stored in environment variable only
-- Local media storage during MVP
-- PostgreSQL database
+## Seed accounts
 
-## Documentation
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@company.com | admin123 |
+| Mentor | mentor@company.com | mentor123 |
+| Intern | intern@company.com | intern123 |
 
-See [../docs/](../docs/) for database design, architecture, and implementation order.
+## API base
+
+- Auth: `/api/auth/`
+- Accounts: `/api/accounts/`
+- Programs: `/api/programs/`
+- Roadmaps: `/api/roadmaps/`
+- Tasks: `/api/tasks/`
+- Submissions: `/api/submissions/`
+- Reports: `/api/reports/`
+
+## Tests
+
+```bash
+python manage.py test tests
+```

@@ -2,13 +2,38 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { RoadmapReadOnlyView } from "@/components/roadmaps/RoadmapWeekView";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { roadmaps } from "@/mock/data";
+import { getErrorMessage } from "@/lib/api/errors";
+import { getRoadmap } from "@/lib/api/roadmaps";
+import type { Roadmap } from "@/types";
 
 export default function RoadmapPreviewPage() {
   const params = useParams<{ id: string }>();
-  const roadmap = roadmaps.find((r) => r.id === params.id);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setRoadmap(await getRoadmap(params.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load roadmap preview."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading preview…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!roadmap) return <p>Roadmap not found.</p>;
 
   return (

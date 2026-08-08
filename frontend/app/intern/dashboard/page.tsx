@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { ChartPlaceholder, BarRow } from "@/components/ui/ChartPlaceholder";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { getInternContext } from "@/lib/intern";
+import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/lib/api/errors";
+import { getInternContext, type InternContext } from "@/lib/intern";
 import { formatDate } from "@/lib/labels";
-import { fullName } from "@/mock/data";
+import { fullName } from "@/lib/names";
 
 function isOverdue(deadline: string, status: string) {
   if (status === "COMPLETED") return false;
@@ -20,15 +23,41 @@ function isOverdue(deadline: string, status: string) {
 }
 
 export default function InternDashboardPage() {
-  const { user } = useMockAuth();
-  const ctx = user ? getInternContext(user.id) : null;
+  const { user } = useAuth();
+  const [ctx, setCtx] = useState<InternContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setCtx(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setCtx(await getInternContext(user.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to load dashboard."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading dashboard…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   if (!ctx || !ctx.program || !ctx.mentor) {
     return (
       <div className="card p-6">
         <h1 className="text-xl font-semibold">No program assigned</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Your intern profile is not linked to an active program in the mock data.
+          Your intern profile is not linked to an active program yet.
         </p>
       </div>
     );

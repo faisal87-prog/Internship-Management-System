@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMockAuth } from "@/context/MockAuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { dashboardPath, navigationByRole } from "@/lib/navigation";
 import { roleLabel } from "@/lib/labels";
-import { fullName } from "@/mock/data";
+import { fullName } from "@/lib/names";
 import type { UserRole } from "@/types";
 
 export function AppShell({
@@ -16,7 +16,7 @@ export function AppShell({
   role: UserRole;
   children: React.ReactNode;
 }) {
-  const { user, isReady, logout } = useMockAuth();
+  const { user, isReady, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -110,7 +110,7 @@ export function AppShell({
                 <p className="text-sm font-semibold text-ink">
                   {roleLabel[role]} workspace
                 </p>
-                <p className="text-xs text-ink-muted">Mock data demo · no live backend</p>
+                <p className="text-xs text-ink-muted">Connected to Django API</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -121,8 +121,8 @@ export function AppShell({
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  logout();
+                onClick={async () => {
+                  await logout();
                   router.push("/login");
                 }}
               >

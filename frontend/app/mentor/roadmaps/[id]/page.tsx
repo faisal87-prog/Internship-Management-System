@@ -2,35 +2,67 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ProgramSummary } from "@/components/programs/ProgramSummary";
 import { RoadmapReadOnlyView } from "@/components/roadmaps/RoadmapWeekView";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { getErrorMessage } from "@/lib/api/errors";
+import { getProgram } from "@/lib/api/programs";
+import { getRoadmap, publishRoadmap } from "@/lib/api/roadmaps";
 import { roadmapScopeLabel } from "@/lib/labels";
-import { getProgram, roadmaps as initialRoadmaps } from "@/mock/data";
-import type { Roadmap } from "@/types";
+import type { InternshipProgram, Roadmap } from "@/types";
 
 export default function RoadmapDetailPage() {
   const params = useParams<{ id: string }>();
-  const seed = initialRoadmaps.find((r) => r.id === params.id);
-  const [roadmap, setRoadmap] = useState<Roadmap | undefined>(
-    seed ? structuredClone(seed) : undefined,
-  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [program, setProgram] = useState<InternshipProgram | null>(null);
   const [message, setMessage] = useState("");
+  const [publishing, setPublishing] = useState(false);
 
-  if (!roadmap) return <p>Roadmap not found.</p>;
-  const program = getProgram(roadmap.programId);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const map = await getRoadmap(params.id);
+      setRoadmap(map);
+      try {
+        setProgram(await getProgram(map.programId));
+      } catch {
+        setProgram(null);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load roadmap."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
 
-  function publish() {
-    setRoadmap((prev) => {
-      if (!prev || prev.status !== "DRAFT") return prev;
-      return { ...prev, status: "PUBLISHED" };
-    });
-    setMessage(
-      "Mock publish complete. All approved roadmap tasks for all weeks would be created and assigned.",
-    );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function publish() {
+    if (!roadmap || roadmap.status !== "DRAFT") return;
+    setPublishing(true);
+    setMessage("");
+    try {
+      const updated = await publishRoadmap(roadmap.id);
+      setRoadmap(updated);
+      setMessage("Roadmap published. Tasks for all weeks are now assigned.");
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not publish roadmap."));
+    } finally {
+      setPublishing(false);
+    }
   }
+
+  if (loading) return <LoadingState label="Loading roadmap…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!roadmap) return <p>Roadmap not found.</p>;
 
   return (
     <div>
@@ -46,8 +78,13 @@ export default function RoadmapDetailPage() {
               Preview
             </Link>
             {roadmap.status === "DRAFT" ? (
-              <button type="button" className="btn-primary" onClick={publish}>
-                Publish roadmap
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void publish()}
+                disabled={publishing}
+              >
+                {publishing ? "Publishing…" : "Publish roadmap"}
               </button>
             ) : null}
           </>

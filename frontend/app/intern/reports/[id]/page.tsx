@@ -2,27 +2,63 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { WeeklyScoreCard } from "@/components/reports/WeeklyScoreCard";
 import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { getInternContext } from "@/lib/intern";
-import { getWeeklyTaskScores } from "@/lib/weeklyScore";
+import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/lib/api/errors";
+import { downloadWeeklyReportPdf } from "@/lib/api/reports";
+import { getInternContext, type InternContext } from "@/lib/intern";
+import type { WeeklyTaskScore } from "@/lib/weeklyScore";
 
 export default function InternReportDetailPage() {
   const params = useParams<{ id: string }>();
-  const { user } = useMockAuth();
-  const ctx = user ? getInternContext(user.id) : null;
+  const { user } = useAuth();
+  const [ctx, setCtx] = useState<InternContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setCtx(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setCtx(await getInternContext(user.id));
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to load report."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   const report = ctx?.approvedReports.find((r) => r.id === params.id);
 
-  const scores = useMemo(
-    () =>
-      report
-        ? getWeeklyTaskScores(report.internProfileId, report.weekNumber)
-        : [],
-    [report],
-  );
+  const scores = useMemo<WeeklyTaskScore[]>(() => {
+    if (!report || !ctx) return [];
+    return ctx.myTasks
+      .filter(
+        (row) =>
+          row.task.weekNumber === report.weekNumber &&
+          typeof row.assignment.score === "number",
+      )
+      .map((row) => ({
+        taskTitle: row.task.title,
+        score: row.assignment.score as number,
+      }));
+  }, [ctx, report]);
+
+  if (loading) return <LoadingState label="Loading report…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   if (!report) {
     return (
@@ -48,6 +84,7 @@ export default function InternReportDetailPage() {
             <DownloadPdfButton
               fileName={`week-${report.weekNumber}-report.pdf`}
               label="Download PDF"
+              onClick={() => downloadWeeklyReportPdf(report.id)}
             />
             <Link href="/intern/reports" className="btn-secondary">Back</Link>
           </>

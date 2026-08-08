@@ -2,36 +2,67 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { InternChipPicker } from "@/components/interns/InternChips";
 import { ProgramSummary } from "@/components/programs/ProgramSummary";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { fullName, getProgram, getUser, internProfiles, programs } from "@/mock/data";
+import { useAuth } from "@/context/AuthContext";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import { listPrograms } from "@/lib/api/programs";
+import { createRoadmap, createRoadmapWeek } from "@/lib/api/roadmaps";
+import { fullName } from "@/lib/names";
+import type { InternshipProgram } from "@/types";
 
 export default function GenerateRoadmapPage() {
-  const { user } = useMockAuth();
+  const { user } = useAuth();
   const router = useRouter();
-  const myPrograms = programs.filter((p) => p.mentorId === user?.id);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [myPrograms, setMyPrograms] = useState<InternshipProgram[]>([]);
+  const [interns, setInterns] = useState<
+    Awaited<ReturnType<typeof listInternProfiles>>
+  >([]);
   const [scope, setScope] = useState<"PROGRAM" | "GROUP" | "INDIVIDUAL">("PROGRAM");
-  const [programId, setProgramId] = useState(myPrograms[0]?.id ?? "");
+  const [programId, setProgramId] = useState("");
   const [selectedInternIds, setSelectedInternIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
-  const selectedProgram = getProgram(programId);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [programs, ips] = await Promise.all([listPrograms(), listInternProfiles()]);
+      const mine = programs.filter((p) => p.mentorId === user?.id);
+      setMyPrograms(mine);
+      setInterns(ips);
+      setProgramId((prev) => prev || mine[0]?.id || "");
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load programs."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selectedProgram = myPrograms.find((p) => p.id === programId);
 
   const internOptions = useMemo(
     () =>
-      internProfiles
+      interns
         .filter((ip) => ip.mentorId === user?.id && ip.programId === programId)
-        .map((ip) => {
-          const u = getUser(ip.userId);
-          return { id: ip.id, name: u ? fullName(u) : ip.id };
-        }),
-    [programId, user?.id],
+        .map((ip) => ({ id: ip.id, name: fullName(ip.user) || ip.id })),
+    [interns, programId, user?.id],
   );
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!selectedProgram) return;
     if (scope !== "PROGRAM" && selectedInternIds.length === 0) {
       setMessage("Select at least one intern for this roadmap scope.");
       return;
@@ -40,11 +71,47 @@ export default function GenerateRoadmapPage() {
       setMessage("Individual scope requires exactly one intern.");
       return;
     }
-    setMessage(
-      "Mock AI request staged: Prompt Builder → LLM → Validation → Draft. No OpenAI call was made.",
-    );
-    setTimeout(() => router.push("/mentor/roadmaps"), 1400);
+
+    setSaving(true);
+    setMessage("");
+    try {
+      const weeks = Math.max(1, selectedProgram.durationWeeks || 1);
+      const roadmap = await createRoadmap({
+        program: Number(selectedProgram.id),
+        title: `${selectedProgram.title} — Learning Roadmap`,
+        summary: "Draft roadmap created for mentor editing.",
+        assignment_scope: scope,
+        number_of_weeks: weeks,
+        assigned_intern_ids:
+          scope === "PROGRAM" ? undefined : selectedInternIds.map(Number),
+        generated_by_ai: false,
+      });
+
+      await Promise.all(
+        Array.from({ length: weeks }, (_, index) =>
+          createRoadmapWeek({
+            roadmap: Number(roadmap.id),
+            week_number: index + 1,
+            weekly_focus: "",
+            learning_objectives: [],
+            expected_skills_gained: [],
+            mentor_notes: "",
+            display_order: index + 1,
+          }),
+        ),
+      );
+
+      setMessage("Draft roadmap created. AI generation is not connected yet.");
+      router.push(`/mentor/roadmaps/${roadmap.id}/edit`);
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not create draft roadmap."));
+    } finally {
+      setSaving(false);
+    }
   }
+
+  if (loading) return <LoadingState label="Loading…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   return (
     <div>
@@ -122,7 +189,9 @@ export default function GenerateRoadmapPage() {
             {message}
           </p>
         ) : null}
-        <button type="submit" className="btn-primary">Request AI generation</button>
+        <button type="submit" className="btn-primary" disabled={saving || !programId}>
+          {saving ? "Creating draft…" : "Request AI generation"}
+        </button>
       </form>
     </div>
   );

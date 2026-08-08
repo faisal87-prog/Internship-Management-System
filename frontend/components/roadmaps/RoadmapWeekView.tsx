@@ -1,17 +1,21 @@
 import { InternChips } from "@/components/interns/InternChips";
 import { formatDate } from "@/lib/labels";
-import { fullName, getUser, internProfiles } from "@/mock/data";
 import type { Roadmap, RoadmapTaskDraft, RoadmapWeek } from "@/types";
 
-function InternNames({ ids }: { ids?: string[] }) {
+function InternNames({
+  ids,
+  internNames,
+}: {
+  ids?: string[];
+  internNames?: Record<string, string>;
+}) {
   if (!ids?.length) {
     return <span className="text-ink-muted">Program scope / unassigned</span>;
   }
-  const items = ids.map((id) => {
-    const profile = internProfiles.find((ip) => ip.id === id);
-    const user = profile ? getUser(profile.userId) : undefined;
-    return { id, name: user ? fullName(user) : id };
-  });
+  const items = ids.map((id) => ({
+    id,
+    name: internNames?.[id] ?? id,
+  }));
   return <InternChips items={items} />;
 }
 
@@ -19,10 +23,12 @@ export function RoadmapTaskCard({
   task,
   readOnly = true,
   actions,
+  internNames,
 }: {
   task: RoadmapTaskDraft;
   readOnly?: boolean;
   actions?: React.ReactNode;
+  internNames?: Record<string, string>;
 }) {
   return (
     <article className="rounded-xl border border-line bg-white p-4">
@@ -65,7 +71,7 @@ export function RoadmapTaskCard({
         <div className="sm:col-span-2">
           <dt className="font-semibold text-ink-muted">Assigned interns</dt>
           <dd>
-            <InternNames ids={task.assignedInternIds} />
+            <InternNames ids={task.assignedInternIds} internNames={internNames} />
           </dd>
         </div>
       </dl>
@@ -79,11 +85,13 @@ export function RoadmapWeekCard({
   readOnly = true,
   actions,
   taskActions,
+  internNames,
 }: {
   week: RoadmapWeek;
   readOnly?: boolean;
   actions?: React.ReactNode;
   taskActions?: (task: RoadmapTaskDraft, weekNumber: number) => React.ReactNode;
+  internNames?: Record<string, string>;
 }) {
   return (
     <section className="card p-5">
@@ -137,6 +145,7 @@ export function RoadmapWeekCard({
             task={task}
             readOnly={readOnly}
             actions={taskActions?.(task, week.weekNumber)}
+            internNames={internNames}
           />
         ))}
       </div>
@@ -144,7 +153,13 @@ export function RoadmapWeekCard({
   );
 }
 
-export function RoadmapReadOnlyView({ roadmap }: { roadmap: Roadmap }) {
+export function RoadmapReadOnlyView({
+  roadmap,
+  internNames,
+}: {
+  roadmap: Roadmap;
+  internNames?: Record<string, string>;
+}) {
   return (
     <div className="space-y-4">
       <section className="card p-5">
@@ -152,7 +167,12 @@ export function RoadmapReadOnlyView({ roadmap }: { roadmap: Roadmap }) {
         <p className="mt-2 text-sm text-ink-muted">{roadmap.summary}</p>
       </section>
       {roadmap.weeks.map((week) => (
-        <RoadmapWeekCard key={week.weekNumber} week={week} readOnly />
+        <RoadmapWeekCard
+          key={week.weekNumber}
+          week={week}
+          readOnly
+          internNames={internNames}
+        />
       ))}
     </div>
   );

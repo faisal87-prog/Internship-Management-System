@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { TaskDetailsPanel } from "@/components/tasks/TaskDetailsPanel";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useMockAuth } from "@/context/MockAuthContext";
-import { getInternContext } from "@/lib/intern";
+import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/lib/api/errors";
+import { createSubmission } from "@/lib/api/submissions";
+import { updateAssignment } from "@/lib/api/tasks";
+import { getInternContext, type InternContext } from "@/lib/intern";
 import { formatDateTime } from "@/lib/labels";
 import type { Submission, TaskStatus } from "@/types";
 
@@ -23,17 +27,45 @@ const transitions: Record<TaskStatus, TaskStatus[]> = {
 
 export default function InternTaskDetailPage() {
   const params = useParams<{ assignmentId: string }>();
-  const { user } = useMockAuth();
-  const ctx = user ? getInternContext(user.id) : null;
-  const row = ctx?.myTasks.find((item) => item.assignment.id === params.assignmentId);
-  const initialSubs = useMemo(
-    () => ctx?.mySubmissions.filter((s) => s.taskAssignmentId === params.assignmentId) ?? [],
-    [ctx, params.assignmentId],
-  );
-
-  const [status, setStatus] = useState<TaskStatus | undefined>(row?.assignment.status);
-  const [subs, setSubs] = useState<Submission[]>(initialSubs);
+  const { user } = useAuth();
+  const [ctx, setCtx] = useState<InternContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<TaskStatus | undefined>();
+  const [subs, setSubs] = useState<Submission[]>([]);
   const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setCtx(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getInternContext(user.id);
+      setCtx(data);
+      const row = data?.myTasks.find((item) => item.assignment.id === params.assignmentId);
+      setStatus(row?.assignment.status);
+      setSubs(
+        data?.mySubmissions.filter((s) => s.taskAssignmentId === params.assignmentId) ?? [],
+      );
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to load task."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.assignmentId, user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <LoadingState label="Loading task…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+
+  const row = ctx?.myTasks.find((item) => item.assignment.id === params.assignmentId);
 
   if (!row || !status) {
     return <p>Task assignment not found for this intern.</p>;
@@ -42,7 +74,18 @@ export default function InternTaskDetailPage() {
   const { assignment, task } = row;
   const nextStatuses = transitions[status];
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onStatusChange(next: TaskStatus) {
+    setMessage("");
+    try {
+      const updated = await updateAssignment(assignment.id, { status: next });
+      setStatus(updated.status);
+      setMessage(`Status updated to ${updated.status}.`);
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Unable to update status."));
+    }
+  }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const writtenResponse = String(form.get("writtenResponse") || "");
@@ -53,23 +96,21 @@ export default function InternTaskDetailPage() {
       setMessage("Add a written response, at least one file, or an external link.");
       return;
     }
-    const version = (subs[subs.length - 1]?.submissionVersion ?? 0) + 1;
-    setSubs((prev) => [
-      ...prev,
-      {
-        id: `local-sub-${version}`,
-        taskAssignmentId: assignment.id,
-        writtenResponse: writtenResponse || undefined,
-        files: fileList.map((f) => f.name),
-        externalLink: externalLink || undefined,
-        internNotes: internNotes || undefined,
-        submissionVersion: version,
-        submittedAt: new Date().toISOString(),
-      },
-    ]);
-    setStatus("SUBMITTED");
-    setMessage(`Submission version ${version} saved locally (mock).`);
-    e.currentTarget.reset();
+    try {
+      const created = await createSubmission({
+        task_assignment: Number(assignment.id),
+        written_response: writtenResponse || undefined,
+        external_url: externalLink || undefined,
+        intern_notes: internNotes || undefined,
+        files: fileList,
+      });
+      setSubs((prev) => [...prev, created]);
+      setStatus("SUBMITTED");
+      setMessage(`Submission version ${created.submissionVersion} saved.`);
+      e.currentTarget.reset();
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Unable to submit work."));
+    }
   }
 
   return (
@@ -113,10 +154,7 @@ export default function InternTaskDetailPage() {
                     key={next}
                     type="button"
                     className="btn-secondary"
-                    onClick={() => {
-                      setStatus(next);
-                      setMessage(`Status updated to ${next} (mock).`);
-                    }}
+                    onClick={() => void onStatusChange(next)}
                   >
                     Mark as {next.split("_").join(" ")}
                   </button>
@@ -129,7 +167,7 @@ export default function InternTaskDetailPage() {
         <section className="card p-5">
           <h2 className="section-title">Submit work</h2>
           <p className="mt-2 text-xs text-ink-muted">{ALLOWED}</p>
-          <form onSubmit={onSubmit} className="mt-4 space-y-3">
+          <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-3">
             <div>
               <label className="label" htmlFor="writtenResponse">Written response</label>
               <textarea id="writtenResponse" name="writtenResponse" className="input" rows={4} />

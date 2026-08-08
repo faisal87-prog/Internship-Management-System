@@ -2,52 +2,105 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { ErrorState, LoadingState } from "@/components/ui/AsyncState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import {
-  fullName,
-  getUser,
-  internProfiles,
-  submissions,
-  taskAssignments,
-  tasks,
-} from "@/mock/data";
-import type { TaskStatus } from "@/types";
+import { listInternProfiles } from "@/lib/api/accounts";
+import { getErrorMessage } from "@/lib/api/errors";
+import { listSubmissions } from "@/lib/api/submissions";
+import { getAssignment, updateAssignment } from "@/lib/api/tasks";
+import { fullName } from "@/lib/names";
+import type { Submission, Task, TaskAssignment, TaskStatus } from "@/types";
 
 export default function ReviewSubmissionPage() {
   const params = useParams<{ assignmentId: string }>();
-  const assignment = taskAssignments.find((ta) => ta.id === params.assignmentId);
-  const [score, setScore] = useState(assignment?.score?.toString() ?? "");
-  const [feedback, setFeedback] = useState(assignment?.mentorFeedback ?? "");
-  const [status, setStatus] = useState<TaskStatus>(assignment?.status ?? "SUBMITTED");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<TaskAssignment | null>(null);
+  const [task, setTask] = useState<Task | null>(null);
+  const [internName, setInternName] = useState("Intern");
+  const [latest, setLatest] = useState<Submission | null>(null);
+  const [score, setScore] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("COMPLETED");
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  if (!assignment) return <p>Assignment not found.</p>;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [{ assignment: assign, task: nestedTask, raw }, submissions, interns] =
+        await Promise.all([
+          getAssignment(params.assignmentId),
+          listSubmissions(params.assignmentId),
+          listInternProfiles(),
+        ]);
+      setAssignment(assign);
+      setTask(nestedTask);
+      setScore(assign.score?.toString() ?? "");
+      setFeedback(assign.mentorFeedback ?? "");
+      setStatus(
+        assign.status === "NEEDS_REVISION" || assign.status === "COMPLETED"
+          ? assign.status
+          : "COMPLETED",
+      );
+      const intern = interns.find((ip) => ip.id === assign.internProfileId);
+      setInternName(intern ? fullName(intern.user) : raw.intern_name || "Intern");
+      const sorted = submissions
+        .slice()
+        .sort((a, b) => b.submissionVersion - a.submissionVersion);
+      setLatest(sorted[0] ?? null);
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not load submission."));
+    } finally {
+      setLoading(false);
+    }
+  }, [params.assignmentId]);
 
-  const task = tasks.find((t) => t.id === assignment.taskId);
-  const intern = getUser(
-    internProfiles.find((ip) => ip.id === assignment.internProfileId)?.userId ?? "",
-  );
-  const latest = submissions
-    .filter((s) => s.taskAssignmentId === assignment.id)
-    .sort((a, b) => b.submissionVersion - a.submissionVersion)[0];
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!assignment) return;
     const parsed = Number(score);
     if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
       setMessage("Score must be an integer between 0 and 100.");
       return;
     }
-    setMessage(`Mock review saved. Status set to ${status}. Score ${parsed}/100.`);
+    if (status !== "COMPLETED" && status !== "NEEDS_REVISION") {
+      setMessage("Outcome must be Completed or Needs revision.");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      const updated = await updateAssignment(assignment.id, {
+        score: parsed,
+        mentor_feedback: feedback,
+        status,
+      });
+      setAssignment(updated);
+      setMessage(`Review saved. Status set to ${status}. Score ${parsed}/100.`);
+    } catch (err) {
+      setMessage(getErrorMessage(err, "Could not save review."));
+    } finally {
+      setSaving(false);
+    }
   }
+
+  if (loading) return <LoadingState label="Loading review…" />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (!assignment) return <p>Assignment not found.</p>;
 
   return (
     <div>
       <PageHeader
         title="Review submission"
-        description={`${task?.title ?? "Task"} · ${intern ? fullName(intern) : "Intern"}`}
+        description={`${task?.title ?? "Task"} · ${internName}`}
         actions={<Link href="/mentor/reviews" className="btn-secondary">Back</Link>}
       />
 
@@ -126,7 +179,9 @@ export default function ReviewSubmissionPage() {
               {message}
             </p>
           ) : null}
-          <button type="submit" className="btn-primary">Save review</button>
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? "Saving…" : "Save review"}
+          </button>
         </form>
       </div>
     </div>
