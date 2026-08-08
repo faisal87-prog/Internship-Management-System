@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { InternChipPicker } from "@/components/interns/InternChips";
 import { ResourceManager } from "@/components/resources/ResourceManager";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
@@ -13,14 +14,28 @@ export default function CreateTaskPage() {
   const { user } = useMockAuth();
   const router = useRouter();
   const myPrograms = programs.filter((p) => p.mentorId === user?.id);
-  const myInterns = internProfiles.filter((ip) => ip.mentorId === user?.id);
+  const internOptions = useMemo(
+    () =>
+      internProfiles
+        .filter((ip) => ip.mentorId === user?.id)
+        .map((ip) => {
+          const u = getUser(ip.userId);
+          return { id: ip.id, name: u ? fullName(u) : ip.id };
+        }),
+    [user?.id],
+  );
+  const [selectedInternIds, setSelectedInternIds] = useState<string[]>([]);
   const [resources, setResources] = useState<LearningResource[]>([]);
   const [message, setMessage] = useState("");
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!selectedInternIds.length) {
+      setMessage("Select at least one intern.");
+      return;
+    }
     setMessage(
-      `Mock manual task created with ${resources.length} resource(s). Each selected intern gets a separate TaskAssignment.`,
+      `Mock manual task created with ${resources.length} resource(s) and ${selectedInternIds.length} assignment(s).`,
     );
     setTimeout(() => router.push("/mentor/tasks"), 1100);
   }
@@ -84,19 +99,13 @@ export default function CreateTaskPage() {
           <label className="label" htmlFor="successCriteria">Success criteria</label>
           <textarea id="successCriteria" className="input" rows={2} />
         </div>
-        <div>
-          <label className="label" htmlFor="interns">Assign interns</label>
-          <select id="interns" className="input" multiple required>
-            {myInterns.map((ip) => {
-              const u = getUser(ip.userId);
-              return (
-                <option key={ip.id} value={ip.id}>
-                  {u ? fullName(u) : ip.id}
-                </option>
-              );
-            })}
-          </select>
-        </div>
+
+        <InternChipPicker
+          options={internOptions}
+          selectedIds={selectedInternIds}
+          onChange={setSelectedInternIds}
+          label="Assign interns"
+        />
 
         <div className="border-t border-line pt-4">
           <ResourceManager resources={resources} onChange={setResources} />

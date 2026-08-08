@@ -688,6 +688,7 @@ export const weeklyReports: WeeklyReport[] = [
       mentorFocusSuggestions: ["Introduce component patterns early in week 2"],
       recommendedFocusNextWeek: "Reusable UI components and accessibility basics",
     },
+    additionalMentorNotes: "Great communication during onboarding week.",
   },
   {
     id: "wr-2",
@@ -719,6 +720,7 @@ export const weeklyReports: WeeklyReport[] = [
       mentorFocusSuggestions: ["Review accessibility labels before approval"],
       recommendedFocusNextWeek: "Kanban board layout and status UX",
     },
+    additionalMentorNotes: "",
   },
 ];
 
@@ -731,6 +733,7 @@ export const finalSummaries: FinalSummary[] = [
     pdfAvailable: true,
     mentorFinalScore: 88,
     mentorFinalComments: "Reliable contributor with strong API fundamentals.",
+    additionalMentorNotes: "Strong ownership on the submission service module.",
     approvedAt: "2026-07-25T10:00:00Z",
     content: {
       overallPerformanceSummary: "Maya completed the backend internship with consistent delivery.",
@@ -746,6 +749,7 @@ export const finalSummaries: FinalSummary[] = [
     programId: "prog-1",
     status: "DRAFT",
     pdfAvailable: false,
+    additionalMentorNotes: "",
     content: {
       overallPerformanceSummary: "Draft final summary placeholder for mid-program review.",
       learningJourney: "Building UI systems expertise across early weeks.",

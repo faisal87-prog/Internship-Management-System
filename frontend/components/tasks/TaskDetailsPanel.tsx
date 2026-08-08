@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InternChips } from "@/components/interns/InternChips";
 import { ResourceList } from "@/components/resources/ResourceList";
 import { formatDate } from "@/lib/labels";
 import type { LearningResource, Task, TaskRequirementType } from "@/types";
@@ -65,10 +66,14 @@ export function TaskDetailsPanel({
         {assignedInternNames ? (
           <div className="sm:col-span-2">
             <dt className="font-semibold text-ink-muted">Assigned interns</dt>
-            <dd className="mt-1">
-              {assignedInternNames.length
-                ? assignedInternNames.join(", ")
-                : "No interns assigned"}
+            <dd className="mt-2">
+              <InternChips
+                items={assignedInternNames.map((name, index) => ({
+                  id: `${name}-${index}`,
+                  name,
+                }))}
+                emptyLabel="No interns assigned"
+              />
             </dd>
           </div>
         ) : null}

@@ -2,16 +2,34 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { InternChipPicker } from "@/components/interns/InternChips";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useMockAuth } from "@/context/MockAuthContext";
+import { fullName, getUser, internProfiles } from "@/mock/data";
 
 export default function NewProgramPage() {
+  const { user } = useMockAuth();
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [selectedInternIds, setSelectedInternIds] = useState<string[]>([]);
+
+  const internOptions = useMemo(
+    () =>
+      internProfiles
+        .filter((ip) => ip.mentorId === user?.id)
+        .map((ip) => {
+          const u = getUser(ip.userId);
+          return { id: ip.id, name: u ? fullName(u) : ip.userId };
+        }),
+    [user?.id],
+  );
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setMessage("Mock program created as Draft. Backend persistence is not connected yet.");
+    setMessage(
+      `Mock program created as Draft with ${selectedInternIds.length} assigned intern(s). Backend persistence is not connected yet.`,
+    );
     setTimeout(() => router.push("/mentor/programs"), 1200);
   }
 
@@ -92,6 +110,16 @@ export default function NewProgramPage() {
           <label className="label" htmlFor="additionalInstructions">Additional instructions (optional)</label>
           <textarea id="additionalInstructions" rows={2} className="input" />
         </div>
+
+        <div className="border-t border-line pt-4">
+          <InternChipPicker
+            options={internOptions}
+            selectedIds={selectedInternIds}
+            onChange={setSelectedInternIds}
+            label="Assigned interns"
+          />
+        </div>
+
         {message ? (
           <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
             {message}

@@ -183,6 +183,8 @@ export interface WeeklyReport {
     mentorFocusSuggestions: string[];
     recommendedFocusNextWeek: string;
   };
+  /** Extra notes added by the mentor before/after editing the AI draft */
+  additionalMentorNotes?: string;
   approvedAt?: string;
 }
 
@@ -200,6 +202,8 @@ export interface FinalSummary {
   };
   mentorFinalScore?: number;
   mentorFinalComments?: string;
+  /** Extra notes/context added by the mentor while editing */
+  additionalMentorNotes?: string;
   pdfAvailable: boolean;
   approvedAt?: string;
 }

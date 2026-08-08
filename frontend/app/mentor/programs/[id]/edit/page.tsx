@@ -2,21 +2,45 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { InternChipPicker } from "@/components/interns/InternChips";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { getProgram } from "@/mock/data";
+import { useMockAuth } from "@/context/MockAuthContext";
+import { fullName, getProgram, getUser, internProfiles } from "@/mock/data";
 
 export default function EditProgramPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useMockAuth();
   const program = getProgram(params.id);
   const [message, setMessage] = useState("");
+  const initialSelected = useMemo(
+    () =>
+      internProfiles
+        .filter((ip) => ip.programId === params.id)
+        .map((ip) => ip.id),
+    [params.id],
+  );
+  const [selectedInternIds, setSelectedInternIds] = useState<string[]>(initialSelected);
+
+  const internOptions = useMemo(
+    () =>
+      internProfiles
+        .filter((ip) => ip.mentorId === user?.id || ip.programId === params.id)
+        .map((ip) => {
+          const u = getUser(ip.userId);
+          return { id: ip.id, name: u ? fullName(u) : ip.userId };
+        }),
+    [params.id, user?.id],
+  );
 
   if (!program) return <p>Program not found.</p>;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setMessage("Mock save complete. Status updates are manual and local only.");
+    setMessage(
+      `Mock save complete with ${selectedInternIds.length} assigned intern(s). Status updates are manual and local only.`,
+    );
     setTimeout(() => router.push(`/mentor/programs/${params.id}`), 1000);
   }
 
@@ -109,6 +133,16 @@ export default function EditProgramPage() {
             defaultValue={program.additionalInstructions ?? ""}
           />
         </div>
+
+        <div className="border-t border-line pt-4">
+          <InternChipPicker
+            options={internOptions}
+            selectedIds={selectedInternIds}
+            onChange={setSelectedInternIds}
+            label="Assigned interns"
+          />
+        </div>
+
         <p className="text-sm text-ink-muted">
           Reference materials are managed on the dedicated materials page for this program.
         </p>

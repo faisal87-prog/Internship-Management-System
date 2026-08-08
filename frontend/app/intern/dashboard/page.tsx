@@ -10,6 +10,15 @@ import { getInternContext } from "@/lib/intern";
 import { formatDate } from "@/lib/labels";
 import { fullName } from "@/mock/data";
 
+function isOverdue(deadline: string, status: string) {
+  if (status === "COMPLETED") return false;
+  const due = new Date(deadline);
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return due < today;
+}
+
 export default function InternDashboardPage() {
   const { user } = useMockAuth();
   const ctx = user ? getInternContext(user.id) : null;
@@ -31,9 +40,7 @@ export default function InternDashboardPage() {
     .filter((ta) => ta.status !== "COMPLETED")
     .slice()
     .sort((a, b) => a.deadline.localeCompare(b.deadline));
-  const attention = assignments.filter((ta) =>
-    ["TO_DO", "IN_PROGRESS", "NEEDS_REVISION", "SUBMITTED"].includes(ta.status),
-  );
+  const overdue = assignments.filter((ta) => isOverdue(ta.deadline, ta.status));
   const recentFeedback = assignments.filter((ta) => ta.mentorFeedback).slice(0, 3);
 
   return (
@@ -56,21 +63,7 @@ export default function InternDashboardPage() {
         <MetricCard label="Approved weekly reports" value={approvedReports.length} />
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        <ChartPlaceholder
-          title="Personal task completion progress"
-          metric="Completed vs total assignments"
-          chartType="Progress bar"
-          summary={`${completed} of ${assignments.length} tasks completed`}
-        >
-          <BarRow label="Completed" value={completed} max={assignments.length || 1} color="bg-success" />
-          <BarRow
-            label="Remaining"
-            value={assignments.length - completed}
-            max={assignments.length || 1}
-          />
-        </ChartPlaceholder>
-
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <ChartPlaceholder
           title="Completed versus remaining tasks"
           metric="Assignment completion split"
@@ -119,25 +112,42 @@ export default function InternDashboardPage() {
 
       <section className="card mt-6 p-5">
         <h2 className="section-title">Tasks requiring attention</h2>
-        <ul className="mt-4 space-y-3">
-          {attention.slice(0, 5).map((ta) => {
-            const task = myTasks.find((row) => row.assignment.id === ta.id)?.task;
-            return (
-              <li key={ta.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
-                <div>
-                  <p className="font-medium text-ink">{task?.title}</p>
-                  <p className="text-xs text-ink-muted">Due {formatDate(ta.deadline)}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge kind="task" value={ta.status} />
-                  <Link href={`/intern/tasks/${ta.id}`} className="text-sm font-semibold text-brand">
-                    Open
-                  </Link>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <p className="mt-1 text-sm text-ink-muted">Overdue tasks for your account only.</p>
+        {overdue.length === 0 ? (
+          <p className="mt-4 text-sm text-ink-muted">No overdue tasks.</p>
+        ) : (
+          <ul className="mt-4 space-y-3">
+            {overdue.map((ta) => {
+              const task = myTasks.find((row) => row.assignment.id === ta.id)?.task;
+              return (
+                <li
+                  key={ta.id}
+                  className="flex flex-col gap-3 rounded-xl border border-line p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-ink">{task?.title ?? "Task"}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Due {formatDate(ta.deadline)}
+                      {task ? ` · Week ${task.weekNumber}` : ""}
+                      {` · ${program.title}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                      Overdue
+                    </span>
+                    <Link
+                      href={`/intern/tasks/${ta.id}`}
+                      className="text-sm font-semibold text-brand"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );

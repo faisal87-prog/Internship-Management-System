@@ -1,20 +1,18 @@
+import { InternChips } from "@/components/interns/InternChips";
 import { formatDate } from "@/lib/labels";
 import { fullName, getUser, internProfiles } from "@/mock/data";
 import type { Roadmap, RoadmapTaskDraft, RoadmapWeek } from "@/types";
 
 function InternNames({ ids }: { ids?: string[] }) {
-  if (!ids?.length) return <span className="text-ink-muted">Program scope / unassigned</span>;
-  return (
-    <span>
-      {ids
-        .map((id) => {
-          const profile = internProfiles.find((ip) => ip.id === id);
-          const user = profile ? getUser(profile.userId) : undefined;
-          return user ? fullName(user) : id;
-        })
-        .join(", ")}
-    </span>
-  );
+  if (!ids?.length) {
+    return <span className="text-ink-muted">Program scope / unassigned</span>;
+  }
+  const items = ids.map((id) => {
+    const profile = internProfiles.find((ip) => ip.id === id);
+    const user = profile ? getUser(profile.userId) : undefined;
+    return { id, name: user ? fullName(user) : id };
+  });
+  return <InternChips items={items} />;
 }
 
 export function RoadmapTaskCard({

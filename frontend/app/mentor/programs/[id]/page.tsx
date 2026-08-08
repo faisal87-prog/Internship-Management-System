@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { InternChips } from "@/components/interns/InternChips";
 import { ProgramSummary } from "@/components/programs/ProgramSummary";
 import { ResourceList } from "@/components/resources/ResourceList";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -49,12 +50,15 @@ export default function MentorProgramDetailPage() {
         <section className="space-y-4">
           <div className="card p-5">
             <h2 className="section-title">Assigned interns</h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              {interns.map((ip) => {
-                const u = getUser(ip.userId);
-                return <li key={ip.id}>{u ? fullName(u) : ip.userId}</li>;
-              })}
-            </ul>
+            <div className="mt-3">
+              <InternChips
+                items={interns.map((ip) => {
+                  const u = getUser(ip.userId);
+                  return { id: ip.id, name: u ? fullName(u) : ip.userId };
+                })}
+                emptyLabel="No interns assigned to this program."
+              />
+            </div>
           </div>
           <div className="card p-5">
             <h2 className="section-title">Roadmaps</h2>

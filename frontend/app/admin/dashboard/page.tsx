@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChartPlaceholder, BarRow } from "@/components/ui/ChartPlaceholder";
+import { ProgramStatusChart } from "@/components/admin/ProgramStatusChart";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -11,19 +11,11 @@ import {
   programs,
   users,
 } from "@/mock/data";
-import type { ProgramStatus } from "@/types";
 
 export default function AdminDashboardPage() {
   const mentors = users.filter((u) => u.role === "MENTOR");
   const interns = users.filter((u) => u.role === "INTERN");
   const activePrograms = programs.filter((p) => p.status === "ACTIVE").length;
-
-  const programByStatus = (
-    ["DRAFT", "ACTIVE", "COMPLETED", "ARCHIVED", "CANCELLED"] as ProgramStatus[]
-  ).map((status) => ({
-    status,
-    count: programs.filter((p) => p.status === status).length,
-  }));
 
   return (
     <div>
@@ -31,9 +23,14 @@ export default function AdminDashboardPage() {
         title="Admin Dashboard"
         description="System oversight across mentors, interns, programs, and final summaries. Admin cannot edit program content or approve mentor workflows."
         actions={
-          <Link href="/admin/users" className="btn-primary">
-            Manage users
-          </Link>
+          <>
+            <Link href="/admin/analytics" className="btn-secondary">
+              Programs analytics
+            </Link>
+            <Link href="/admin/users" className="btn-primary">
+              Manage users
+            </Link>
+          </>
         }
       />
 
@@ -46,16 +43,7 @@ export default function AdminDashboardPage() {
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-1">
-          <ChartPlaceholder
-            title="Programs by status"
-            metric="Count of programs per status"
-            chartType="Bar chart"
-            summary={`${activePrograms} programs currently active.`}
-          >
-            {programByStatus.map((row) => (
-              <BarRow key={row.status} label={row.status} value={row.count} max={4} />
-            ))}
-          </ChartPlaceholder>
+          <ProgramStatusChart />
         </div>
 
         <section className="card p-5 xl:col-span-1">

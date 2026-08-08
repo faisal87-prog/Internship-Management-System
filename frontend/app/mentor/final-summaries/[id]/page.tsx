@@ -8,20 +8,29 @@ import { DownloadPdfButton } from "@/components/resources/DownloadPdfButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { finalSummaries, fullName, getUser, internProfiles } from "@/mock/data";
-import type { AiContentStatus } from "@/types";
+import type { AiContentStatus, FinalSummary } from "@/types";
 
 export default function FinalSummaryDetailPage() {
   const params = useParams<{ id: string }>();
   const summary = finalSummaries.find((fs) => fs.id === params.id);
   const [status, setStatus] = useState<AiContentStatus | undefined>(summary?.status);
+  const [content, setContent] = useState<FinalSummary["content"] | undefined>(
+    summary?.content,
+  );
   const [score, setScore] = useState(summary?.mentorFinalScore?.toString() ?? "");
   const [comments, setComments] = useState(summary?.mentorFinalComments ?? "");
+  const [mentorNotes, setMentorNotes] = useState(summary?.additionalMentorNotes ?? "");
   const [message, setMessage] = useState("");
 
-  if (!summary || !status) return <p>Final summary not found.</p>;
+  if (!summary || !status || !content) return <p>Final summary not found.</p>;
   const intern = getUser(
     internProfiles.find((ip) => ip.id === summary.internProfileId)?.userId ?? "",
   );
+  const editable = status === "DRAFT";
+
+  function saveEdits() {
+    setMessage("Mock edits saved to draft (frontend only).");
+  }
 
   return (
     <div>
@@ -41,6 +50,11 @@ export default function FinalSummaryDetailPage() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         <StatusBadge kind="ai" value={status} />
+        {editable ? (
+          <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand-dark">
+            Edit mode
+          </span>
+        ) : null}
         <button
           type="button"
           className="btn-secondary"
@@ -50,22 +64,27 @@ export default function FinalSummaryDetailPage() {
         >
           Regenerate
         </button>
-        {status === "DRAFT" ? (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => {
-              const parsed = Number(score);
-              if (score && (!Number.isInteger(parsed) || parsed < 0 || parsed > 100)) {
-                setMessage("Final score must be an integer 0–100.");
-                return;
-              }
-              setStatus("APPROVED");
-              setMessage("Final summary approved and stored.");
-            }}
-          >
-            Approve summary
-          </button>
+        {editable ? (
+          <>
+            <button type="button" className="btn-secondary" onClick={saveEdits}>
+              Save edits
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                const parsed = Number(score);
+                if (score && (!Number.isInteger(parsed) || parsed < 0 || parsed > 100)) {
+                  setMessage("Final score must be an integer 0–100.");
+                  return;
+                }
+                setStatus("APPROVED");
+                setMessage("Final summary approved and stored.");
+              }}
+            >
+              Approve summary
+            </button>
+          </>
         ) : null}
       </div>
       {message ? (
@@ -74,7 +93,11 @@ export default function FinalSummaryDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-5">
-          <FinalSummaryContent content={summary.content} />
+          <FinalSummaryContent
+            content={content}
+            editable={editable}
+            onChange={setContent}
+          />
         </section>
 
         <section className="card space-y-4 p-5">
@@ -89,20 +112,42 @@ export default function FinalSummaryDetailPage() {
               className="input"
               value={score}
               onChange={(e) => setScore(e.target.value)}
-              disabled={status !== "DRAFT"}
+              disabled={!editable}
             />
+            {score ? (
+              <p className="mt-1 text-xs text-ink-muted">
+                Displayed as {Number.isInteger(Number(score)) ? `${score} / 100` : "—"}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label" htmlFor="comments">Mentor final comments</label>
             <textarea
               id="comments"
               className="input"
-              rows={5}
+              rows={4}
               value={comments}
               onChange={(e) => setComments(e.target.value)}
-              disabled={status !== "DRAFT"}
+              disabled={!editable}
             />
           </div>
+          <div>
+            <label className="label" htmlFor="mentorNotes">Additional Mentor Notes</label>
+            <textarea
+              id="mentorNotes"
+              className="input"
+              rows={4}
+              value={mentorNotes}
+              onChange={(e) => setMentorNotes(e.target.value)}
+              disabled={!editable}
+              placeholder="Add any extra comments or context."
+            />
+          </div>
+          {editable ? (
+            <button type="button" className="btn-secondary" onClick={saveEdits}>
+              Save edits
+            </button>
+          ) : null}
           <p className="text-xs text-ink-muted">
             AI does not make hiring decisions. No automatic hiring recommendation is shown.
           </p>

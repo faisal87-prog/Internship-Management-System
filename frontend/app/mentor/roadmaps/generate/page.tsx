@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { InternChipPicker } from "@/components/interns/InternChips";
 import { ProgramSummary } from "@/components/programs/ProgramSummary";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
@@ -14,14 +15,31 @@ export default function GenerateRoadmapPage() {
   const myPrograms = programs.filter((p) => p.mentorId === user?.id);
   const [scope, setScope] = useState<"PROGRAM" | "GROUP" | "INDIVIDUAL">("PROGRAM");
   const [programId, setProgramId] = useState(myPrograms[0]?.id ?? "");
+  const [selectedInternIds, setSelectedInternIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const selectedProgram = getProgram(programId);
-  const interns = internProfiles.filter(
-    (ip) => ip.mentorId === user?.id && ip.programId === programId,
+
+  const internOptions = useMemo(
+    () =>
+      internProfiles
+        .filter((ip) => ip.mentorId === user?.id && ip.programId === programId)
+        .map((ip) => {
+          const u = getUser(ip.userId);
+          return { id: ip.id, name: u ? fullName(u) : ip.id };
+        }),
+    [programId, user?.id],
   );
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (scope !== "PROGRAM" && selectedInternIds.length === 0) {
+      setMessage("Select at least one intern for this roadmap scope.");
+      return;
+    }
+    if (scope === "INDIVIDUAL" && selectedInternIds.length !== 1) {
+      setMessage("Individual scope requires exactly one intern.");
+      return;
+    }
     setMessage(
       "Mock AI request staged: Prompt Builder → LLM → Validation → Draft. No OpenAI call was made.",
     );
@@ -42,7 +60,10 @@ export default function GenerateRoadmapPage() {
             id="programId"
             className="input"
             value={programId}
-            onChange={(e) => setProgramId(e.target.value)}
+            onChange={(e) => {
+              setProgramId(e.target.value);
+              setSelectedInternIds([]);
+            }}
             required
           >
             {myPrograms.map((p) => (
@@ -72,7 +93,10 @@ export default function GenerateRoadmapPage() {
                   name="scope"
                   value={value}
                   checked={scope === value}
-                  onChange={() => setScope(value)}
+                  onChange={() => {
+                    setScope(value);
+                    setSelectedInternIds([]);
+                  }}
                 />
                 {label}
               </label>
@@ -80,22 +104,18 @@ export default function GenerateRoadmapPage() {
           </div>
         </fieldset>
         {scope !== "PROGRAM" ? (
-          <div>
-            <label className="label" htmlFor="interns">Assigned intern(s)</label>
-            <select id="interns" className="input" multiple={scope === "GROUP"} required>
-              {interns.map((ip) => {
-                const u = getUser(ip.userId);
-                return (
-                  <option key={ip.id} value={ip.id}>
-                    {u ? fullName(u) : ip.id}
-                  </option>
-                );
-              })}
-            </select>
-            {scope === "GROUP" ? (
-              <p className="mt-1 text-xs text-ink-muted">Hold Ctrl/Cmd to select multiple.</p>
-            ) : null}
-          </div>
+          <InternChipPicker
+            options={internOptions}
+            selectedIds={selectedInternIds}
+            onChange={(ids) => {
+              if (scope === "INDIVIDUAL") {
+                setSelectedInternIds(ids.slice(-1));
+              } else {
+                setSelectedInternIds(ids);
+              }
+            }}
+            label={scope === "INDIVIDUAL" ? "Assigned intern" : "Assigned interns"}
+          />
         ) : null}
         {message ? (
           <p className="rounded-xl bg-brand-light px-3 py-2 text-sm text-brand-dark" role="status">

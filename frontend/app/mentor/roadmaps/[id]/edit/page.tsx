@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { InternChipPicker } from "@/components/interns/InternChips";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RoadmapWeekCard } from "@/components/roadmaps/RoadmapWeekView";
@@ -249,33 +250,17 @@ export default function EditRoadmapPage() {
         </div>
 
         {roadmap.scope !== "PROGRAM" ? (
-          <div>
-            <p className="label">Assigned interns</p>
-            <div className="space-y-2">
-              {programInterns.map((ip) => {
-                const user = getUser(ip.userId);
-                const checked = roadmap.assignedInternIds.includes(ip.id);
-                return (
-                  <label key={ip.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setRoadmap((prev) => {
-                          if (!prev) return prev;
-                          const ids = checked
-                            ? prev.assignedInternIds.filter((id) => id !== ip.id)
-                            : [...prev.assignedInternIds, ip.id];
-                          return { ...prev, assignedInternIds: ids };
-                        });
-                      }}
-                    />
-                    {user ? fullName(user) : ip.id}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          <InternChipPicker
+            options={programInterns.map((ip) => {
+              const user = getUser(ip.userId);
+              return { id: ip.id, name: user ? fullName(user) : ip.id };
+            })}
+            selectedIds={roadmap.assignedInternIds}
+            onChange={(ids) =>
+              setRoadmap((prev) => (prev ? { ...prev, assignedInternIds: ids } : prev))
+            }
+            label="Assigned interns"
+          />
         ) : null}
 
         <div className="flex flex-wrap gap-2">
@@ -535,34 +520,20 @@ export default function EditRoadmapPage() {
                   <option value="OPTIONAL">Optional</option>
                 </select>
               </div>
-              <div>
-                <p className="label">Assigned interns</p>
-                <div className="space-y-2">
-                  {programInterns.map((ip) => {
-                    const user = getUser(ip.userId);
-                    const checked = editingTask.task.assignedInternIds?.includes(ip.id) ?? false;
-                    return (
-                      <label key={ip.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            const current = editingTask.task.assignedInternIds ?? [];
-                            const next = checked
-                              ? current.filter((id) => id !== ip.id)
-                              : [...current, ip.id];
-                            setEditingTask({
-                              ...editingTask,
-                              task: { ...editingTask.task, assignedInternIds: next },
-                            });
-                          }}
-                        />
-                        {user ? fullName(user) : ip.id}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              <InternChipPicker
+                options={programInterns.map((ip) => {
+                  const user = getUser(ip.userId);
+                  return { id: ip.id, name: user ? fullName(user) : ip.id };
+                })}
+                selectedIds={editingTask.task.assignedInternIds ?? []}
+                onChange={(ids) =>
+                  setEditingTask({
+                    ...editingTask,
+                    task: { ...editingTask.task, assignedInternIds: ids },
+                  })
+                }
+                label="Assigned interns"
+              />
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn-secondary" onClick={() => setEditingTask(null)}>

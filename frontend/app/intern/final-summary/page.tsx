@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMockAuth } from "@/context/MockAuthContext";
 import { getInternContext } from "@/lib/intern";
+import { formatScoreOutOf100 } from "@/lib/weeklyScore";
 
 export default function InternFinalSummaryPage() {
   const { user } = useMockAuth();
@@ -32,23 +33,29 @@ export default function InternFinalSummaryPage() {
           description="When your mentor approves your final internship summary, you can view and download it here."
         />
       ) : (
-        <div className="space-y-4">
-          <section className="card p-6">
-            <FinalSummaryContent content={summary.content} />
-            {typeof summary.mentorFinalScore === "number" ? (
-              <div className="mt-4 text-sm">
-                <h2 className="font-semibold text-ink">Mentor final score</h2>
-                <p className="mt-1 text-ink-muted">{summary.mentorFinalScore}/100</p>
-              </div>
-            ) : null}
-            {summary.mentorFinalComments ? (
-              <div className="mt-4 text-sm">
-                <h2 className="font-semibold text-ink">Mentor comments</h2>
-                <p className="mt-1 text-ink-muted">{summary.mentorFinalComments}</p>
-              </div>
-            ) : null}
-          </section>
-        </div>
+        <section className="card space-y-4 p-6">
+          <FinalSummaryContent content={summary.content} />
+          {typeof summary.mentorFinalScore === "number" ? (
+            <div className="text-sm">
+              <h2 className="font-semibold text-ink">Mentor final score</h2>
+              <p className="mt-1 text-ink-muted">
+                {formatScoreOutOf100(summary.mentorFinalScore)}
+              </p>
+            </div>
+          ) : null}
+          {summary.mentorFinalComments ? (
+            <div className="text-sm">
+              <h2 className="font-semibold text-ink">Mentor comments</h2>
+              <p className="mt-1 text-ink-muted">{summary.mentorFinalComments}</p>
+            </div>
+          ) : null}
+          {summary.additionalMentorNotes ? (
+            <div className="text-sm">
+              <h2 className="font-semibold text-ink">Additional Mentor Notes</h2>
+              <p className="mt-1 text-ink-muted">{summary.additionalMentorNotes}</p>
+            </div>
+          ) : null}
+        </section>
       )}
     </div>
   );
