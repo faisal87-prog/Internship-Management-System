@@ -3,11 +3,33 @@ from rest_framework import serializers
 
 from apps.programs.models import InternProfile
 from apps.roadmaps.models import Roadmap, RoadmapWeek
-from apps.tasks.models import TaskAssignment
+from apps.tasks.models import Task, TaskAssignment
 from common.constants import RoadmapScope, RoadmapStatus
 
 
+class NestedWeekTaskSerializer(serializers.ModelSerializer):
+    """Minimal read-only task representation embedded inside a RoadmapWeek."""
+
+    class Meta:
+        model = Task
+        fields = [
+            "id",
+            "title",
+            "description",
+            "difficulty",
+            "estimated_time_minutes",
+            "deliverable",
+            "success_criteria",
+            "due_date",
+            "requirement_type",
+            "source",
+            "display_order",
+        ]
+
+
 class RoadmapWeekSerializer(serializers.ModelSerializer):
+    tasks = NestedWeekTaskSerializer(many=True, read_only=True)
+
     class Meta:
         model = RoadmapWeek
         fields = [
@@ -21,10 +43,11 @@ class RoadmapWeekSerializer(serializers.ModelSerializer):
             "start_date",
             "end_date",
             "display_order",
+            "tasks",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "tasks", "created_at", "updated_at"]
 
 
 class RoadmapSerializer(serializers.ModelSerializer):

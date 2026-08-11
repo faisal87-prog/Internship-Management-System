@@ -120,13 +120,54 @@ export default function ReviewSubmissionPage() {
           </div>
           <div>
             <h2 className="font-semibold text-ink">Files</h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              {latest?.files.join(", ") || "None"}
-            </p>
+            {latest?.files.length ? (
+              <ul className="mt-1 space-y-1">
+                {latest.files.map((f) => (
+                  <li key={f.url || f.name}>
+                    {f.url ? (
+                      <a
+                        href={f.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={f.name}
+                        className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {f.name}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-ink-muted">{f.name}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-ink-muted">None</p>
+            )}
           </div>
           <div>
             <h2 className="font-semibold text-ink">External link</h2>
-            <p className="mt-1 text-sm text-ink-muted">{latest?.externalLink || "None"}</p>
+            {latest?.externalLink ? (
+              <a
+                href={
+                  latest.externalLink.startsWith("http")
+                    ? latest.externalLink
+                    : `https://${latest.externalLink}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+              >
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                {latest.externalLink}
+              </a>
+            ) : (
+              <p className="mt-1 text-sm text-ink-muted">None</p>
+            )}
           </div>
           {latest?.internNotes ? (
             <div>

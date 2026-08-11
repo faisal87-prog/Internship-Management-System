@@ -9,6 +9,8 @@ from common.validators import infer_resource_type, validate_score, validate_uplo
 
 class TaskResourceSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    # resource_type is auto-inferred in validate() — not required from the caller
+    resource_type = serializers.CharField(required=False)
 
     class Meta:
         model = TaskResource
@@ -105,6 +107,10 @@ class TaskAssignmentSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
     )
+    # intern is set via TaskSerializer.create() only — never written through this serializer
+    intern = serializers.PrimaryKeyRelatedField(read_only=True)
+    # Explicit integer field so the frontend has an unambiguous PK without guessing
+    intern_profile_id = serializers.IntegerField(source="intern_id", read_only=True)
     intern_name = serializers.CharField(source="intern.user.full_name", read_only=True)
     effective_due_date = serializers.DateField(read_only=True)
     is_overdue = serializers.SerializerMethodField()
@@ -116,6 +122,7 @@ class TaskAssignmentSerializer(serializers.ModelSerializer):
             "task",
             "task_id",
             "intern",
+            "intern_profile_id",
             "intern_name",
             "status",
             "due_date_override",
@@ -131,6 +138,8 @@ class TaskAssignmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "intern",
+            "intern_profile_id",
             "assigned_at",
             "reviewed_at",
             "completed_at",

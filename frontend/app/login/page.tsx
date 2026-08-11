@@ -71,6 +71,7 @@ export default function LoginPage() {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
+                suppressHydrationWarning
               />
             </div>
 
@@ -88,6 +89,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"

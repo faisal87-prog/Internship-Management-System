@@ -17,6 +17,7 @@ import {
   updateRoadmap,
   updateRoadmapWeek,
 } from "@/lib/api/roadmaps";
+import { createTask } from "@/lib/api/tasks";
 import { fullName } from "@/lib/names";
 import type { Roadmap, RoadmapScope, RoadmapTaskDraft, RoadmapWeek } from "@/types";
 
@@ -189,7 +190,7 @@ export default function EditRoadmapPage() {
       ),
     }));
     setEditingTask(null);
-    setMessage("Task updated locally. Nested roadmap tasks are not persisted via the week API.");
+    setMessage("Task updated. Click 'Save draft' to persist all changes.");
   }
 
   async function saveDraft() {
@@ -217,15 +218,42 @@ export default function EditRoadmapPage() {
           mentor_notes: week.mentorNotes || "",
           display_order: week.weekNumber,
         };
+
+        let savedWeekId: string;
         if (week.id) {
           const saved = await updateRoadmapWeek(week.id, payload);
           weeks[i] = { ...week, ...saved, id: week.id };
+          savedWeekId = week.id;
         } else {
           const created = await createRoadmapWeek({
             roadmap: Number(roadmap.id),
             ...payload,
           });
           weeks[i] = { ...week, ...created, id: created.id ?? week.id };
+          savedWeekId = created.id ?? "";
+        }
+
+        // Persist any new tasks (local IDs start with "task-") to the backend
+        if (savedWeekId) {
+          for (const task of week.suggestedTasks) {
+            const isLocal = !task.id || task.id.startsWith("task-");
+            if (isLocal) {
+              await createTask({
+                programId: roadmap.programId,
+                roadmapWeekId: savedWeekId,
+                title: task.title,
+                description: task.description || "—",
+                difficulty: task.difficulty || "EASY",
+                estimatedTime: task.estimatedTime || "1 hour",
+                dueDate: task.dueDate || new Date().toISOString().slice(0, 10),
+                requirementType: task.requirementType || "REQUIRED",
+                deliverable: task.deliverable || "",
+                successCriteria: task.successCriteria || "",
+                source: "MANUAL",
+                assignInternIds: task.assignedInternIds ?? [],
+              });
+            }
+          }
         }
       }
 

@@ -56,7 +56,7 @@ export default function MentorTaskAssignmentPage() {
       setTask(resolvedTask);
       setDeadline(assign.deadline?.slice(0, 10) || "");
       const intern = interns.find((ip) => ip.id === assign.internProfileId);
-      setInternName(intern ? fullName(intern.user) : raw.intern_name || "Intern");
+      setInternName(intern ? fullName(intern.user) : assign.internName || raw.intern_name || "Intern");
 
       if (resolvedTask) {
         const taskResources = await listTaskResources(resolvedTask.id);
@@ -114,12 +114,16 @@ export default function MentorTaskAssignmentPage() {
     files: File[];
   }): Promise<LearningResource[]> {
     if (!task) return [];
+    if (!input.files.length && !input.externalLink) {
+      throw new Error("Provide a file or an external link (or both).");
+    }
     const created: LearningResource[] = [];
     if (input.files.length) {
       for (const file of input.files) {
         created.push(
           await createTaskResource({
             task: Number(task.id),
+            // title falls back to filename inside createTaskResource if empty
             title: input.title || file.name,
             file,
             external_url: input.externalLink || undefined,
@@ -131,7 +135,7 @@ export default function MentorTaskAssignmentPage() {
         await createTaskResource({
           task: Number(task.id),
           title: input.title || input.externalLink,
-          external_url: input.externalLink || undefined,
+          external_url: input.externalLink,
         }),
       );
     }
@@ -226,16 +230,88 @@ export default function MentorTaskAssignmentPage() {
         <h2 className="section-title">Submission history</h2>
         <ul className="mt-4 space-y-3">
           {subs.map((sub) => (
-            <li key={sub.id} className="rounded-xl border border-line p-3 text-sm">
-              <p className="font-semibold">Version {sub.submissionVersion}</p>
-              <p className="mt-1 text-ink-muted">{sub.writtenResponse}</p>
-              <p className="mt-2 text-xs text-ink-muted">
-                Files: {sub.files.join(", ") || "None"}
-                {sub.externalLink ? ` · Link: ${sub.externalLink}` : ""}
-              </p>
+            <li key={sub.id} className="rounded-xl border border-line p-4 text-sm space-y-3">
+
+              {/* Version + date */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-ink">Version {sub.submissionVersion}</p>
+                <p className="text-xs text-ink-muted">{formatDate(sub.submittedAt)}</p>
+              </div>
+
+              {/* Written response */}
+              {sub.writtenResponse ? (
+                <p className="text-ink-muted whitespace-pre-wrap">{sub.writtenResponse}</p>
+              ) : null}
+
+              {/* Intern notes */}
+              {sub.internNotes ? (
+                <p className="text-xs text-ink-muted italic">
+                  Intern notes: {sub.internNotes}
+                </p>
+              ) : null}
+
+              {/* Uploaded files — each is a clickable download link */}
+              {sub.files.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold text-ink-muted mb-1">
+                    Attached files
+                  </p>
+                  <ul className="space-y-1">
+                    {sub.files.map((f) => (
+                      <li key={f.url || f.name}>
+                        {f.url ? (
+                          <a
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={f.name}
+                            className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline break-all"
+                          >
+                            {/* Paper-clip icon */}
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            {f.name}
+                          </a>
+                        ) : (
+                          <span className="text-ink-muted">{f.name}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* External link */}
+              {sub.externalLink ? (
+                <div>
+                  <p className="text-xs font-semibold text-ink-muted mb-1">
+                    External link
+                  </p>
+                  <a
+                    href={
+                      sub.externalLink.startsWith("http")
+                        ? sub.externalLink
+                        : `https://${sub.externalLink}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline break-all"
+                  >
+                    {/* External link icon */}
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    {sub.externalLink}
+                  </a>
+                </div>
+              ) : null}
+
             </li>
           ))}
-          {subs.length === 0 ? <li className="text-ink-muted">No submissions yet.</li> : null}
+          {subs.length === 0 ? (
+            <li className="text-ink-muted">No submissions yet.</li>
+          ) : null}
         </ul>
       </section>
     </div>

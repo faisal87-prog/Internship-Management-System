@@ -52,14 +52,20 @@ export default function ProgramMaterialsPage() {
     e.preventDefault();
     if (!program) return;
     const form = new FormData(e.currentTarget);
-    const title = String(form.get("title") || "");
     const externalLink = String(form.get("externalLink") || "").trim();
     const fileField = form.get("file");
     const file = fileField instanceof File && fileField.name ? fileField : null;
+
+    // At least one of file or external link is required
     if (!file && !externalLink) {
-      setMessage("Provide a file or an external link.");
+      setMessage("Provide a file or an external link (or both).");
       return;
     }
+
+    // Auto-derive title from filename or URL if left blank
+    const rawTitle = String(form.get("title") || "").trim();
+    const title = rawTitle || (file ? file.name : externalLink);
+
     setBusy(true);
     setMessage("");
     try {
@@ -111,17 +117,27 @@ export default function ProgramMaterialsPage() {
 
       <form onSubmit={onSubmit} className="card mb-6 grid gap-4 p-5 md:grid-cols-2">
         <div className="md:col-span-2">
-          <label className="label" htmlFor="title">Title</label>
-          <input id="title" name="title" required className="input" />
+          <label className="label" htmlFor="title">
+            Title <span className="text-ink-muted font-normal">(optional — auto-filled from filename or URL)</span>
+          </label>
+          <input id="title" name="title" className="input" placeholder="e.g. UI Guidelines" />
         </div>
         <div>
-          <label className="label" htmlFor="file">File upload</label>
-          <input id="file" name="file" type="file" className="input" />
+          <label className="label" htmlFor="file">
+            File upload <span className="text-ink-muted font-normal">(optional)</span>
+          </label>
+          <input id="file" name="file" type="file" className="input"
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.csv,.zip" />
         </div>
         <div>
-          <label className="label" htmlFor="externalLink">External link (optional)</label>
+          <label className="label" htmlFor="externalLink">
+            External link <span className="text-ink-muted font-normal">(optional)</span>
+          </label>
           <input id="externalLink" name="externalLink" type="url" className="input" placeholder="https://" />
         </div>
+        <p className="md:col-span-2 text-xs text-ink-muted -mt-2">
+          At least one of file or external link is required.
+        </p>
         <div className="md:col-span-2">
           <button type="submit" className="btn-primary" disabled={busy}>
             Add material

@@ -41,6 +41,9 @@ export default function CreateTaskPage() {
           .filter((ip) => ip.mentorId === user?.id)
           .map((ip) => ({ id: ip.id, name: fullName(ip.user) || ip.id })),
       );
+      // fullName(ip.user) is now null-safe — ip.user is always present on
+      // InternProfileWithUser returned by listInternProfiles(), but the guard
+      // in fullName() prevents a crash if it ever comes back undefined.
     } catch (err) {
       setError(getErrorMessage(err, "Could not load form data."));
     } finally {
@@ -79,13 +82,16 @@ export default function CreateTaskPage() {
       });
 
       for (const resource of resources) {
+        const isLink = resource.kind === "LINK" || (!resource.file && resource.href?.startsWith("http"));
+        const external_url = isLink ? resource.href : undefined;
+        // Derive title the same way the API clients do — never send a blank title
+        const title =
+          (resource.title ?? "").trim() ||
+          (resource.file ? resource.file.name : external_url ?? "Task resource");
         await createTaskResource({
           task: Number(task.id),
-          title: resource.title,
-          external_url:
-            resource.kind === "LINK" || resource.href?.startsWith("http")
-              ? resource.href
-              : undefined,
+          title,
+          external_url,
           file: resource.file ?? null,
         });
       }

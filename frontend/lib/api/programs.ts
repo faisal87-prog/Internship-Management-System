@@ -44,9 +44,14 @@ export async function createProgramMaterial(payload: {
   external_url?: string;
   file?: File | null;
 }) {
+  // Derive a sensible title if the caller did not provide one
+  const title =
+    payload.title.trim() ||
+    (payload.file ? payload.file.name : payload.external_url ?? "Reference material");
+
   const form = new FormData();
   form.append("program", String(payload.program));
-  form.append("title", payload.title);
+  form.append("title", title);
   if (payload.external_url) form.append("external_url", payload.external_url);
   if (payload.file) form.append("file", payload.file);
   const data = await apiRequest("/api/programs/materials/items/", {

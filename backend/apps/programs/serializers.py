@@ -11,6 +11,8 @@ from common.validators import infer_resource_type, validate_upload_file
 
 class ProgramReferenceMaterialSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    # resource_type is auto-inferred in validate() — not required from the caller
+    resource_type = serializers.CharField(required=False)
 
     class Meta:
         model = ProgramReferenceMaterial

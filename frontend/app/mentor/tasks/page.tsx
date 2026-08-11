@@ -42,14 +42,35 @@ export default function MentorTasksPage() {
       const myProgramIds = new Set(
         programs.filter((p) => p.mentorId === user?.id).map((p) => p.id),
       );
-      const myInterns = ips.filter((ip) => ip.mentorId === user?.id);
-      const internIds = new Set(myInterns.map((ip) => ip.id));
+
+      // Build name map from intern profiles (may be empty if the request fails
+      // or returns no results — assignments still show via ta.internName fallback).
       const names: Record<string, string> = {};
-      myInterns.forEach((ip) => {
-        names[ip.id] = fullName(ip.user) || ip.id;
+      ips.forEach((ip) => {
+        const n = fullName(ip.user) || ip.id;
+        names[ip.id] = n;
       });
+
+      // Seed any gaps directly from the assignment's own intern_name field so
+      // cards never show blank when the profile list is missing an entry.
+      assigns.forEach((ta) => {
+        if (ta.internName && !names[ta.internProfileId]) {
+          names[ta.internProfileId] = ta.internName;
+        }
+      });
+
       setInternNames(names);
-      setAssignments(assigns.filter((ta) => internIds.has(ta.internProfileId)));
+
+      // Show ALL assignments that belong to the mentor's programs — do NOT
+      // filter by internIds because that Set can be empty when listInternProfiles
+      // returns nothing, which was silently hiding every card.
+      setAssignments(assigns.filter((ta) => {
+        // Keep assignment if its task belongs to one of this mentor's programs.
+        // ta.taskId maps to a task whose programId is in myProgramIds.
+        const task = taskList.find((t) => t.id === ta.taskId);
+        return task ? myProgramIds.has(task.programId) : true;
+      }));
+
       setTasks(taskList.filter((t) => myProgramIds.has(t.programId)));
     } catch (err) {
       setError(getErrorMessage(err, "Could not load tasks."));
@@ -103,7 +124,7 @@ export default function MentorTasksPage() {
                       >
                         <p className="font-semibold text-ink">{task?.title}</p>
                         <p className="mt-1 text-xs text-ink-muted">
-                          {internNames[ta.internProfileId] || "Intern"} · Week {task?.weekNumber}
+                          {internNames[ta.internProfileId] || ta.internName || "Intern"} · Week {task?.weekNumber}
                         </p>
                         <p className="mt-2 text-xs text-ink-muted">Due {formatDate(ta.deadline)}</p>
                       </Link>

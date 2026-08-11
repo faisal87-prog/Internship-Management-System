@@ -71,9 +71,14 @@ export async function createTaskResource(payload: {
   external_url?: string;
   file?: File | null;
 }) {
+  // Derive a sensible title if the caller did not provide one
+  const title =
+    (payload.title ?? "").trim() ||
+    (payload.file ? payload.file.name : payload.external_url ?? "Task resource");
+
   const form = new FormData();
   form.append("task", String(payload.task));
-  form.append("title", payload.title);
+  form.append("title", title);
   if (payload.external_url) form.append("external_url", payload.external_url);
   if (payload.file) form.append("file", payload.file);
   const data = await apiRequest("/api/tasks/resources/", {

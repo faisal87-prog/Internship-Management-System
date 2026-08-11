@@ -234,7 +234,11 @@ export function adaptAssignment(raw: any): TaskAssignment {
   return {
     id: String(raw.id),
     taskId: String(raw.task?.id ?? raw.task ?? raw.task_id),
-    internProfileId: String(raw.intern?.id ?? raw.intern ?? raw.intern_id),
+    // prefer the dedicated intern_profile_id field; fall back to the raw FK integer
+    internProfileId: String(raw.intern_profile_id ?? raw.intern?.id ?? raw.intern ?? raw.intern_id),
+    // store the server-provided name so the UI never shows a blank while the
+    // intern profile list is still loading (or if the lookup misses)
+    internName: raw.intern_name || "",
     status: raw.status as TaskStatus,
     deadline: raw.effective_due_date || raw.due_date_override || raw.task?.due_date || raw.deadline,
     score: raw.score ?? undefined,
@@ -248,9 +252,12 @@ export function adaptSubmission(raw: any): Submission {
     id: String(raw.id),
     taskAssignmentId: String(raw.task_assignment?.id ?? raw.task_assignment),
     writtenResponse: raw.written_response || raw.writtenResponse || "",
-    files: (raw.files || []).map(
-      (file: any) => file.original_file_name || file.file_url || String(file.id),
-    ),
+    // Each file object from the backend has file_url (absolute) and
+    // original_file_name. Preserve both so the UI can render clickable links.
+    files: (raw.files || []).map((file: any) => ({
+      name: file.original_file_name || file.file_name || file.fileName || "Download file",
+      url: file.file_url || file.url || "",
+    })),
     externalLink: raw.external_url || raw.externalLink || "",
     submissionVersion: Number(raw.version_number ?? raw.submissionVersion ?? 1),
     internNotes: raw.intern_notes || raw.internNotes || "",

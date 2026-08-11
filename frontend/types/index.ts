@@ -153,6 +153,9 @@ export interface TaskAssignment {
   id: string;
   taskId: string;
   internProfileId: string;
+  /** Name as returned directly by the API — available immediately without a
+   *  secondary listInternProfiles() lookup */
+  internName: string;
   status: TaskStatus;
   deadline: string;
   score?: number;
@@ -160,11 +163,18 @@ export interface TaskAssignment {
   completedAt?: string;
 }
 
+export interface SubmissionFile {
+  /** Display name shown to the user */
+  name: string;
+  /** Absolute URL from the Django media server for download/preview */
+  url: string;
+}
+
 export interface Submission {
   id: string;
   taskAssignmentId: string;
   writtenResponse?: string;
-  files: string[];
+  files: SubmissionFile[];
   externalLink?: string;
   submissionVersion: number;
   internNotes?: string;
